@@ -177,7 +177,8 @@ addEventListener('touchend', tend); addEventListener('touchcancel', tend);
 
 // ---------- update check ----------
 function newer(a, b) { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; }
-fetch('https://api.github.com/repos/' + REPO + '/releases/latest').then(r => r.json()).then(j => {
+const native = window.Capacitor || navigator.userAgent.includes('Electron');
+(native ? fetch('https://api.github.com/repos/' + REPO + '/releases/latest') : Promise.resolve({ json: () => ({}) })).then(r => r.json()).then(j => {
   const v = (j.tag_name || '').replace(/^v/, ''); if (!v || !newer(v, VER)) return;
   const u = document.getElementById('upd'); u.style.display = 'block';
   if (navigator.userAgent.includes('Electron')) { u.textContent = 'Update v' + v + ' downloading, restarts automatically'; return; }
@@ -188,6 +189,20 @@ fetch('https://api.github.com/repos/' + REPO + '/releases/latest').then(r => r.j
     if (window.Capacitor) { const { Browser } = await import('@capacitor/browser'); Browser.open({ url }); } else window.open(url, '_blank');
   };
 }).catch(() => {});
+
+// ---------- live web updates ----------
+if (!native && location.protocol.startsWith('http')) {
+  setInterval(async () => {
+    try {
+      const j = await (await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })).json();
+      if (j.version && j.version !== VER) {
+        save();
+        const u = document.getElementById('upd'); u.style.display = 'block'; u.textContent = 'New version v' + j.version + ', reloading...';
+        setTimeout(() => location.replace(location.pathname + '?v=' + j.version), 3000);
+      }
+    } catch (e) {}
+  }, 30000);
+}
 
 // ---------- loop ----------
 let last = performance.now();
