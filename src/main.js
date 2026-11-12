@@ -121,6 +121,56 @@ function move(e, axis, d) {
 function phys(e, mx, mz, dt) { e.vel.y -= 28 * dt; move(e, 'x', mx * dt); move(e, 'z', mz * dt); e.ground = false; move(e, 'y', e.vel.y * dt); if (e.pos.y <= 0) { e.pos.y = 0; e.vel.y = 0; e.ground = true; } }
 const dist2 = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
+// ---------- sound (synthesized, no files) ----------
+let AC = null, master = null, nb = null, eng = null, stepT = 0, muted = false;
+try { muted = localStorage.getItem('mw_mute') === '1'; } catch (e) {}
+function audio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = 0.5; master.connect(AC.destination); } catch (e) {} }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+['keydown', 'mousedown', 'touchstart'].forEach(k => addEventListener(k, () => audio(), { passive: true }));
+function tone(f1, f2, dur, type = 'square', vol = 0.3) {
+  const a = AC; if (!a || muted) return;
+  const o = a.createOscillator(), g = a.createGain(), t = a.currentTime;
+  o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, vol, freq, type = 'lowpass') {
+  const a = AC; if (!a || muted) return;
+  if (!nb) { nb = a.createBuffer(1, a.sampleRate, a.sampleRate); const d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+  const s = a.createBufferSource(); s.buffer = nb;
+  const f = a.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+  const g = a.createGain(), t = a.currentTime; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t, Math.random() * 0.5, dur + 0.02);
+}
+function sfx(n, v = 1) {
+  if (!audio() || muted) return;
+  switch (n) {
+    case 'shoot': noise(0.14, 0.5 * v, 900, 'highpass'); tone(500, 70, 0.14, 'sawtooth', 0.3 * v); break;
+    case 'punch': noise(0.08, 0.5 * v, 500); tone(140, 60, 0.1, 'square', 0.25 * v); break;
+    case 'hit': tone(900, 400, 0.05, 'square', 0.12 * v); break;
+    case 'place': tone(330, 220, 0.07, 'square', 0.18 * v); break;
+    case 'brk': noise(0.15, 0.4 * v, 1400); break;
+    case 'hurt': tone(220, 80, 0.22, 'sawtooth', 0.35 * v); break;
+    case 'die': tone(400, 60, 0.7, 'sawtooth', 0.35 * v); break;
+    case 'edie': tone(260, 50, 0.3, 'sawtooth', 0.25 * v); break;
+    case 'npcplace': tone(520, 380, 0.05, 'triangle', 0.18 * v); break;
+    case 'chop': noise(0.07, 0.35 * v, 700); tone(180, 120, 0.05, 'square', 0.12 * v); break;
+    case 'mine': tone(1200, 700, 0.04, 'square', 0.12 * v); noise(0.05, 0.3 * v, 2500, 'highpass'); break;
+    case 'crash': noise(0.25, 0.6 * v, 600); tone(100, 40, 0.25, 'sawtooth', 0.3 * v); break;
+    case 'step': noise(0.04, 0.1 * v, 450); break;
+  }
+}
+function sfxAt(pos, n) { const v = 1 - dist2(pos, P.pos) / 45; if (v > 0.05) sfx(n, v); }
+function startEngine() { const a = audio(); if (!a || eng) return; const o = a.createOscillator(), g = a.createGain(); o.type = 'sawtooth'; o.frequency.value = 45; g.gain.value = 0.05; o.connect(g); g.connect(master); o.start(); eng = { o, g }; }
+function engine(sp) { if (eng) { eng.o.frequency.value = 45 + sp * 5; eng.g.gain.value = muted ? 0 : 0.05 + Math.min(0.06, sp * 0.003); } }
+function stopEngine() { if (eng) { try { eng.o.stop(); } catch (e) {} eng = null; } }
+function toggleMute() { muted = !muted; try { localStorage.setItem('mw_mute', muted ? '1' : '0'); } catch (e) {} $('mute').textContent = muted ? '🔇' : '🔊'; if (muted && eng) eng.g.gain.value = 0; }
+$('mute').textContent = muted ? '🔇' : '🔊';
+$('mute').addEventListener('click', toggleMute);
+
 // ---------- blocks ----------
 let sel = 0;
 const boxGeo = new THREE.BoxGeometry(2, 2, 2);
@@ -164,8 +214,8 @@ let msgT = 0;
 function msg(t, ms = 1800) { const m = $('msg'); m.textContent = t; m.style.display = 'block'; clearTimeout(msgT); msgT = setTimeout(() => m.style.display = 'none', ms); }
 function hurt(n) {
   if (inCar) return;
-  P.hp -= n; lastHurt = clock; flashV = 0.45;
-  if (P.hp <= 0) { P.hp = 100; P.pos.set(25, 1, 25); P.vel.set(0, 0, 0); msg('YOU DIED'); flashV = 0.8; }
+  P.hp -= n; lastHurt = clock; flashV = 0.45; sfx('hurt');
+  if (P.hp <= 0) { P.hp = 100; P.pos.set(25, 1, 25); P.vel.set(0, 0, 0); msg('YOU DIED'); sfx('die'); flashV = 0.8; }
   hud();
 }
 function jump() { if (P.ground) { P.vel.y = 11; P.ground = false; } }
@@ -176,6 +226,7 @@ function playerStep(dt) {
   const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; }
   const sp = keys.ShiftLeft ? 12 : 7;
   phys(P, mx * sp, mz * sp, dt);
+  if (P.ground && (mx || mz)) { stepT -= dt; if (stepT <= 0) { sfx('step'); stepT = keys.ShiftLeft ? 0.28 : 0.42; } }
   if (P.pos.y < -50) P.pos.set(25, 3, 25);
   cam.position.set(P.pos.x, P.pos.y + 1.55, P.pos.z); cam.rotation.set(P.pitch, P.yaw, 0);
   if (P.hp < 100 && clock - lastHurt > 5) { P.hp = Math.min(100, P.hp + 3 * dt); hud(); }
@@ -194,20 +245,20 @@ function mkCar(x, z, h, col) {
 }
 mkCar(25, 45, 0, 0xd62828); mkCar(45, 25, Math.PI / 2, 0x2a9d8f); mkCar(-25, -5, 0, 0xf4a261); mkCar(75, -25, Math.PI / 2, 0x6a4c93);
 function toggleCar() {
-  if (inCar) { const c = inCar; inCar = null; c.speed = 0; P.pos.set(c.pos.x + Math.cos(c.h) * 3, 0, c.pos.z - Math.sin(c.h) * 3); P.vel.set(0, 0, 0); P.yaw = c.h + Math.PI; P.pitch = 0; return; }
+  if (inCar) { const c = inCar; inCar = null; c.speed = 0; stopEngine(); P.pos.set(c.pos.x + Math.cos(c.h) * 3, 0, c.pos.z - Math.sin(c.h) * 3); P.vel.set(0, 0, 0); P.yaw = c.h + Math.PI; P.pitch = 0; return; }
   let best = null, bd = 5;
   for (const c of cars) { const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; best = c; } }
-  if (best) { inCar = best; msg('W/S drive, A/D steer, Space brake, E exit', 2500); } else msg('No car nearby', 900);
+  if (best) { inCar = best; startEngine(); msg('W/S drive, A/D steer, Space brake, E exit', 2500); } else msg('No car nearby', 900);
 }
 function driveCar(dt) {
   const c = inCar, thr = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - joy.y, steer = (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) - joy.x;
   if (Math.abs(thr) > 0.1) c.speed += thr * 18 * dt; else c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 8 * dt);
   if (keys.Space) c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 25 * dt);
-  c.speed = Math.max(-8, Math.min(26, c.speed));
+  c.speed = Math.max(-8, Math.min(26, c.speed)); engine(Math.abs(c.speed));
   c.h += steer * 1.8 * dt * Math.max(-1, Math.min(1, c.speed / 5));
   const t = { pos: new V3(c.pos.x + Math.sin(c.h) * c.speed * dt, 0, c.pos.z + Math.cos(c.h) * c.speed * dt), R: 1.3, H: 1.2 };
   let bad = false; for (const b of solids.values()) if (hit(t, b)) { bad = true; break; }
-  if (bad) c.speed *= -0.3; else c.pos.copy(t.pos);
+  if (bad) { if (Math.abs(c.speed) > 4) sfx('crash'); c.speed *= -0.3; } else c.pos.copy(t.pos);
   c.mesh.position.copy(c.pos); c.mesh.rotation.y = c.h;
   if (Math.abs(c.speed) > 6) for (const e of enemies) if (!e.dead && dist2(e.pos, c.pos) < 2.3) damageEnemy(e, 100);
   P.pos.copy(c.pos);
@@ -237,8 +288,8 @@ function spawnEnemy() {
 }
 function damageEnemy(e, n, quiet) {
   if (e.dead) return;
-  e.hp -= n; e.hurt = 0.12;
-  if (e.hp <= 0) { e.dead = true; scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); if (!quiet) { kills++; hud(); } }
+  e.hp -= n; e.hurt = 0.12; sfxAt(e.pos, 'hit');
+  if (e.hp <= 0) { sfxAt(e.pos, 'edie'); e.dead = true; scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); if (!quiet) { kills++; hud(); } }
 }
 function enemyStep(e, dt) {
   let T = inCar ? inCar.pos : P.pos, npc = null;
@@ -435,7 +486,7 @@ function doGather(n, res, amount, dt) {
   if (!walkTo(n, nd.pos.x, nd.pos.z, dt, 2.2)) { n.working = false; return 'busy'; }
   n.working = true; n.face = Math.atan2(nd.pos.x - n.pos.x, nd.pos.z - n.pos.z); n.work += dt;
   nd.mesh.rotation.z = Math.sin(clock * 20) * 0.04;
-  if (n.work >= 0.5) { n.work = 0; nd.left--; n.inv[res]++; nd.mesh.scale.setScalar(0.45 + 0.55 * nd.left / nd.max); if (nd.left <= 0) nd.mesh.visible = false; }
+  if (n.work >= 0.5) { n.work = 0; sfxAt(nd.pos, res === 'wood' ? 'chop' : 'mine'); nd.left--; n.inv[res]++; nd.mesh.scale.setScalar(0.45 + 0.55 * nd.left / nd.max); if (nd.left <= 0) nd.mesh.visible = false; }
   return 'busy';
 }
 function finish(n, text) { n.last = text; ev(n.name + ' ' + text); n.task = null; n.sub = null; n.gnode = null; n.working = false; n.idleT = 0; n.status = 'standing by'; }
@@ -445,7 +496,7 @@ function npcStep(n, dt) {
   if (foe) {
     const d = dist2(foe.pos, n.pos);
     if (d > 2.2) { if (n.role === 'guard' || (n.task && n.task.type === 'guard')) { walkTo(n, foe.pos.x, foe.pos.z, dt, 1.8, 5.8); n.status = 'fighting thugs'; return; } }
-    else { n.face = Math.atan2(foe.pos.x - n.pos.x, foe.pos.z - n.pos.z); if (n.cd <= 0) { n.cd = 0.6; n.swing = 0.25; damageEnemy(foe, n.role === 'guard' ? 25 : 12, true); } n.status = 'fighting'; phys(n, 0, 0, dt); return; }
+    else { n.face = Math.atan2(foe.pos.x - n.pos.x, foe.pos.z - n.pos.z); if (n.cd <= 0) { n.cd = 0.6; n.swing = 0.25; sfxAt(n.pos, 'punch'); damageEnemy(foe, n.role === 'guard' ? 25 : 12, true); } n.status = 'fighting'; phys(n, 0, 0, dt); return; }
   }
   const t = n.task;
   if (!t) { phys(n, 0, 0, dt); n.idleT += dt; const dp = dist2(P.pos, n.pos); if (dp < 12) n.face = Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z); return; }
@@ -472,7 +523,7 @@ function npcStep(n, dt) {
     phys(n, 0, 0, dt); n.working = true; n.face = Math.atan2(wx - n.pos.x, wz - n.pos.z); n.work += dt;
     if (n.work >= 0.35) {
       if (!cellFree(c.cx, c.cy, c.cz)) { t.stuckSkip += 0.35; if (t.stuckSkip > 4) { t.stuckSkip = 0; t.i++; } n.work = 0.3; return; }
-      n.work = 0; t.stuckSkip = 0; addBlock(c.cx, c.cy, c.cz, c.t, true, true); n.inv[res]--; t.i++;
+      n.work = 0; t.stuckSkip = 0; addBlock(c.cx, c.cy, c.cz, c.t, true, true); sfxAt(n.pos, 'npcplace'); n.inv[res]--; t.i++;
       const g = new THREE.BufferGeometry().setFromPoints([new V3(n.pos.x, n.pos.y + 1.4, n.pos.z), new V3(wx, c.cy * 2 + 1, wz)]);
       const ln = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x66ddff })); scene.add(ln); setTimeout(() => { scene.remove(ln); g.dispose(); }, 120);
     }
@@ -592,22 +643,22 @@ function place() {
   const cx = Math.floor(p.x / 2), cy = Math.floor(p.y / 2), cz = Math.floor(p.z / 2);
   if (cy < 0) return;
   if (hit(P, new THREE.Box3(new V3(cx * 2, cy * 2, cz * 2), new V3(cx * 2 + 2, cy * 2 + 2, cz * 2 + 2)))) return;
-  addBlock(cx, cy, cz, sel);
+  addBlock(cx, cy, cz, sel); sfx('place');
 }
-function brk() { const h = aim(); if (h && h.object.userData.k) delBlock(h.object.userData.k); }
+function brk() { const h = aim(); if (h && h.object.userData.k) { delBlock(h.object.userData.k); sfx('brk'); } }
 function tracer(to) {
   const g = new THREE.BufferGeometry().setFromPoints([cam.localToWorld(new V3(0.3, -0.25, -0.8)), to]);
   const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xffee88 })); scene.add(l); setTimeout(() => { scene.remove(l); g.dispose(); }, 70);
 }
 function shoot() {
-  if (cool > 0) return; cool = 0.25;
+  if (cool > 0) return; cool = 0.25; sfx('shoot');
   cam.updateMatrixWorld(); gun.setFromCamera({ x: 0, y: 0 }, cam);
   const h = gun.intersectObjects([...targets, ...enemyMeshes], false)[0];
   tracer(h ? h.point : gun.ray.at(70, new V3()));
   if (h && h.object.userData.enemy) damageEnemy(h.object.userData.enemy, h.object.userData.head ? 60 : 25);
 }
 function punch() {
-  if (cool > 0) return; cool = 0.4;
+  if (cool > 0) return; cool = 0.4; sfx('punch');
   const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
   for (const e of enemies) { if (e.dead) continue; const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d < 2.8 && (dx * fx + dz * fz) / (d || 1) > 0.2) damageEnemy(e, 20); }
 }
@@ -637,6 +688,7 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.code === 'Space') { if (!inCar) jump(); e.preventDefault(); }
   if (e.code === 'KeyQ') toggleMode();
+  if (e.code === 'KeyM') toggleMute();
   if (e.code === 'KeyE') toggleCar();
   if (e.code === 'KeyT') { e.preventDefault(); openChat(); }
   if (e.code === 'KeyF' && !inCar) punch();
@@ -657,7 +709,7 @@ if (!isTouch) {
 const tch = {};
 function btn(id, fn) { $(id).addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); fn(); }, { passive: false }); }
 btn('jump', () => { if (!inCar) jump(); }); btn('place', act1); btn('brk', act2); btn('col', () => selBlock(sel + 1)); btn('mode', toggleMode); btn('car', toggleCar); btn('chatbtn', openChat);
-const uiTarget = t => t.closest && t.closest('#chatbar,#panel,#gear,.b');
+const uiTarget = t => t.closest && t.closest('#chatbar,#panel,#gear,#mute,.b');
 addEventListener('touchstart', e => { for (const t of e.changedTouches) { if (uiTarget(t.target)) continue; tch[t.identifier] = { x: t.clientX, y: t.clientY, mode: t.clientX < innerWidth / 2 ? 'joy' : 'look' }; } }, { passive: false });
 addEventListener('touchmove', e => {
   if (!uiTarget(e.target)) e.preventDefault();
