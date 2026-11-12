@@ -24,11 +24,31 @@ canvas{display:block}
 #flash{position:fixed;inset:0;background:#f00;opacity:0;pointer-events:none}
 #msg{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:28px;font-weight:700;text-shadow:0 2px 6px #000;pointer-events:none;display:none}
 #mode{right:162px;bottom:40px}#car{right:162px;bottom:120px}
+#labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.nl{position:absolute;left:0;top:0;text-align:center;color:#fff;font-size:12px;text-shadow:0 1px 2px #000;white-space:nowrap;will-change:transform}
+.nl small{opacity:.8}.nl .st{opacity:.9;font-size:11px}
+.nl .bub{background:#fffe;color:#111;border-radius:8px;padding:4px 8px;margin-bottom:3px;max-width:230px;white-space:normal;text-shadow:none;font-size:12px;display:none}
+#aistat{position:fixed;top:22px;right:8px;color:#fff;font-size:11px;text-shadow:0 1px 2px #000}
+#log{position:fixed;right:8px;top:40px;width:min(330px,50vw);font-size:12px;color:#fff;text-shadow:0 1px 2px #000;pointer-events:none}
+#log div{background:#0006;border-radius:6px;padding:3px 6px;margin-top:3px}
+#log .th{font-style:italic;opacity:.85}#log .ev{opacity:.7}#log .me{background:#2e86de99}
+#chatbar{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);width:min(520px,92vw);display:none;gap:6px;z-index:20}
+#chatbar input{flex:1;padding:10px;border-radius:8px;border:2px solid #fff;font-size:16px;-webkit-user-select:text;user-select:text}
+#chatbar button,#panel button{padding:10px 14px;border-radius:8px;border:0;background:#2e86de;color:#fff;font-size:15px}
+#panel{position:fixed;inset:0;margin:auto;width:min(420px,92vw);height:fit-content;background:#111e;color:#fff;padding:14px;border-radius:12px;display:none;z-index:30;font-size:13px}
+#panel input{width:100%;padding:9px;margin:4px 0 10px;border-radius:6px;border:1px solid #888;font-size:14px;-webkit-user-select:text;user-select:text}
+#gear{position:fixed;top:1px;right:62px;font-size:18px;background:none;border:0;color:#fff;z-index:9}
+#chatbtn{left:30px;bottom:150px}
 </style></head><body>
 <div id="cross"></div><div id="hot"></div><div id="ver"></div><div id="upd"></div>
-<div id="help"><br><br><br>WASD move · Shift run · Space jump · Q build/fight · E car<br>BUILD: click place, right-click break, 1-6 block<br>FIGHT: click shoot, F or right-click punch</div>
+<div id="help"><br><br><br>WASD move · Shift run · Space jump · Q build/fight · E car · T chat<br>BUILD: click place, right-click break, 1-6 block<br>FIGHT: click shoot, F or right-click punch</div>
 <div id="hp"><i></i></div><div id="info"></div><div id="flash"></div><div id="msg"></div>
+<div id="labels"></div><div id="aistat"></div><div id="log"></div>
+<button id="gear">⚙</button>
+<div id="chatbar"><input id="chatin" placeholder="Talk to your NPCs (e.g. Archie, build a house near me)" maxlength="300"><button id="chatsend">Send</button></div>
+<div id="panel"><b>NPC brain (RelayAPI)</b><br><br>Relay URL<input id="relurl"><br>API key (saved on this device only)<input id="relkey" type="password" placeholder="paste your relay key"><button id="relsave">Save</button> <button id="relclose" style="background:#555">Close</button></div>
 <div id="joy"></div>
+<div class="b" id="chatbtn">CHAT</div>
 <div class="b" id="mode">MODE</div><div class="b" id="car">CAR</div>
 <div class="b" id="jump">JUMP</div><div class="b" id="place">PLACE</div><div class="b" id="brk">BREAK</div><div class="b" id="col">BLOCK</div>
 <script type="module" src="/src/main.js"></script>
