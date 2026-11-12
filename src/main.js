@@ -19,13 +19,14 @@ function mkTex(w, h, draw) {
 const rr = (a, b) => a + Math.random() * (b - a);
 function speck(g, w, h, n, l, d) { for (let i = 0; i < n; i++) { g.fillStyle = Math.random() < 0.5 ? l : d; g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1 + Math.random() * 2); } }
 function facade(base, frame) {
-  return mkTex(256, 256, (g, w, h) => {
+  const lits = [];
+  const T = mkTex(256, 256, (g, w, h) => {
     g.fillStyle = base; g.fillRect(0, 0, w, h); speck(g, w, h, 1800, 'rgba(255,255,255,.07)', 'rgba(0,0,0,.08)');
     g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(0, 0, w, 4); g.fillRect(0, 128, w, 4);
     for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) {
       const x = c * 64 + 12, y = r * 128 + 30, ww = 40, hh = 70;
       g.fillStyle = frame; g.fillRect(x - 3, y - 3, ww + 6, hh + 6);
-      const lit = Math.random() < 0.28, gr = g.createLinearGradient(0, y, 0, y + hh);
+      const lit = Math.random() < 0.28; if (lit) lits.push([x, y, ww, hh]); const gr = g.createLinearGradient(0, y, 0, y + hh);
       if (lit) { gr.addColorStop(0, '#ffe9a8'); gr.addColorStop(1, '#f5c15b'); } else { gr.addColorStop(0, '#6f97b8'); gr.addColorStop(1, '#1d3347'); }
       g.fillStyle = gr; g.fillRect(x, y, ww, hh);
       g.fillStyle = frame; g.fillRect(x + ww / 2 - 1, y, 2, hh); g.fillRect(x, y + hh * 0.45, ww, 2);
@@ -33,12 +34,14 @@ function facade(base, frame) {
       g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(x - 4, y + hh + 3, ww + 8, 3);
     }
   });
+  T._em = mkTex(256, 256, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffd27a'; for (const [x, y, ww, hh] of lits) g.fillRect(x, y, ww, hh); });
+  return T;
 }
 const FACADES = [['#b7aea0', '#3a3a3a'], ['#a86656', '#2a2a2a'], ['#8f9aa8', '#20252b'], ['#d0c3a4', '#4a4036']].map(([b, f]) => facade(b, f));
 const matCache = {};
 function sideMat(v, wm, hm) {
   const rx = Math.max(1, Math.round(wm / 8)), ry = Math.max(1, Math.round(hm / 8)), k = v + '|' + rx + '|' + ry;
-  if (!matCache[k]) { const t = FACADES[v].clone(); t.needsUpdate = true; t.repeat.set(rx, ry); matCache[k] = new THREE.MeshLambertMaterial({ map: t }); }
+  if (!matCache[k]) { const t = FACADES[v].clone(); t.needsUpdate = true; t.repeat.set(rx, ry); const e = FACADES[v]._em.clone(); e.needsUpdate = true; e.repeat.set(rx, ry); matCache[k] = new THREE.MeshLambertMaterial({ map: t, emissive: 0xffffff, emissiveMap: e, emissiveIntensity: 0 }); }
   return matCache[k];
 }
 const roofTop = new THREE.MeshLambertMaterial({ map: mkTex(64, 64, (g, w, h) => { g.fillStyle = '#6a6c70'; g.fillRect(0, 0, w, h); speck(g, w, h, 500, 'rgba(255,255,255,.1)', 'rgba(0,0,0,.15)'); }) });
@@ -74,7 +77,7 @@ const ren = new THREE.WebGLRenderer({ antialias: !isTouch });
 ren.setSize(innerWidth, innerHeight);
 ren.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.appendChild(ren.domElement);
-scene.add(new THREE.HemisphereLight(0xffffff, 0x556655, 1.1));
+const hemi = new THREE.HemisphereLight(0xffffff, 0x556655, 1.1); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
 sun.position.set(60, 100, 30);
 scene.add(sun);
@@ -683,6 +686,22 @@ if (native) {
   }, 30000);
 }
 
+// ---------- day / night ----------
+let dayT = 0.3;
+const cNight = new THREE.Color(0x070b1f), cDay = new THREE.Color(0x87ceeb), cDusk = new THREE.Color(0xff8a50), cTmp = new THREE.Color();
+function updateSky(dt) {
+  dayT = (dayT + dt / 300) % 1;
+  const a = dayT * Math.PI * 2, sy = -Math.cos(a);
+  const day = Math.min(1, Math.max(0, (sy + 0.15) / 0.4)), dusk = Math.max(0, 1 - Math.abs(sy) / 0.3) * 0.6;
+  cTmp.copy(cNight).lerp(cDay, day).lerp(cDusk, dusk);
+  scene.background.copy(cTmp); scene.fog.color.copy(cTmp);
+  sun.position.set(Math.sin(a) * 100, sy * 100 + 5, 30); sun.intensity = 0.05 + 1.15 * day;
+  hemi.intensity = 0.28 + 0.82 * day;
+  for (const k in matCache) matCache[k].emissiveIntensity = (1 - day) * 1.1;
+}
+setInterval(() => { const h = Math.floor(dayT * 24), m = Math.floor((dayT * 24 - h) * 60); $('ver').textContent = 'v' + VER + ' · ' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }, 1000);
+updateSky(0);
+
 // ---------- loop ----------
 hud();
 for (let i = 0; i < 6; i++) spawnEnemy();
@@ -690,6 +709,7 @@ logLine('Press T (or CHAT) to talk to Archie, Mason and Ranger. ⚙ = set your r
 let last = performance.now(), spawnT = 0;
 ren.setAnimationLoop(now => {
   const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
+  updateSky(dt);
   if (inCar) driveCar(dt); else playerStep(dt);
   if (held && mode === 'fight' && !inCar) shoot();
   for (let i = enemies.length - 1; i >= 0; i--) { if (enemies[i].dead) enemies.splice(i, 1); else enemyStep(enemies[i], dt); }
