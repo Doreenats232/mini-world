@@ -1,1 +1,1 @@
-{ "appId": "com.mld.miniworld", "appName": "MiniWorld", "webDir": "dist" }
+{ "appId": "com.mld.miniworld", "appName": "MiniWorld", "webDir": "dist", "server": { "url": "https://doreenats232.github.io/mini-world/" } }

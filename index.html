@@ -18,10 +18,18 @@ canvas{display:block}
 #jump{right:18px;bottom:90px}#place{right:90px;bottom:40px}#brk{right:18px;bottom:20px;background:#a006}#col{right:90px;bottom:120px}
 #joy{position:fixed;left:30px;bottom:30px;width:110px;height:110px;border-radius:50%;background:#0003;border:2px solid #fff6;display:none}
 .touch #joy{display:block}
+#hp{position:fixed;top:28px;left:8px;width:160px;height:12px;background:#0007;border:2px solid #fff;border-radius:6px;overflow:hidden}
+#hp i{display:block;height:100%;width:100%;background:#e33}
+#info{position:fixed;top:48px;left:8px;color:#fff;font-size:13px;text-shadow:0 1px 2px #000}
+#flash{position:fixed;inset:0;background:#f00;opacity:0;pointer-events:none}
+#msg{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:28px;font-weight:700;text-shadow:0 2px 6px #000;pointer-events:none;display:none}
+#mode{right:162px;bottom:40px}#car{right:162px;bottom:120px}
 </style></head><body>
 <div id="cross"></div><div id="hot"></div><div id="ver"></div><div id="upd"></div>
-<div id="help">WASD move · Shift run · Space jump<br>Click = place · Right click = break · 1-6 / wheel = block</div>
+<div id="help"><br><br><br>WASD move · Shift run · Space jump · Q build/fight · E car<br>BUILD: click place, right-click break, 1-6 block<br>FIGHT: click shoot, F or right-click punch</div>
+<div id="hp"><i></i></div><div id="info"></div><div id="flash"></div><div id="msg"></div>
 <div id="joy"></div>
+<div class="b" id="mode">MODE</div><div class="b" id="car">CAR</div>
 <div class="b" id="jump">JUMP</div><div class="b" id="place">PLACE</div><div class="b" id="brk">BREAK</div><div class="b" id="col">BLOCK</div>
 <script type="module" src="/src/main.js"></script>
 </body></html>
