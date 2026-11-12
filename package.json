@@ -1,0 +1,34 @@
+{
+  "name": "mini-world",
+  "version": "1.0.0",
+  "description": "Mini open world sandbox",
+  "author": "Daglas",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "dist": "vite build && electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "@capacitor/browser": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "electron-updater": "^6.1.7",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "vite": "^5.2.0"
+  },
+  "build": {
+    "appId": "com.mld.miniworld",
+    "productName": "MiniWorld",
+    "directories": { "output": "release" },
+    "files": ["dist/**", "electron/**", "package.json"],
+    "win": { "target": "nsis" },
+    "nsis": { "oneClick": true, "artifactName": "MiniWorld-Setup.exe" },
+    "publish": [{ "provider": "github", "owner": "Doreenats232", "repo": "mini-world" }]
+  }
+}

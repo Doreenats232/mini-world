@@ -1,0 +1,27 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>MiniWorld</title>
+<style>
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;font-family:system-ui,sans-serif;touch-action:none}
+canvas{display:block}
+#cross{position:fixed;left:50%;top:50%;width:14px;height:14px;margin:-7px;border:2px solid #fff;border-radius:50%;opacity:.8;pointer-events:none}
+#hot{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+#hot div{width:38px;height:38px;border:3px solid #0006;border-radius:6px}
+#hot div.on{border-color:#fff}
+#ver{position:fixed;top:6px;right:8px;color:#fff;font-size:12px;text-shadow:0 1px 2px #000}
+#help{position:fixed;top:6px;left:8px;color:#fff;font-size:12px;text-shadow:0 1px 2px #000;line-height:1.4}
+#upd{position:fixed;top:30px;left:50%;transform:translateX(-50%);background:#ffd400;color:#000;padding:8px 14px;border-radius:8px;font-size:14px;display:none;z-index:9}
+.b{position:fixed;width:62px;height:62px;border-radius:50%;background:#0006;border:2px solid #fff8;color:#fff;font-size:12px;display:none;align-items:center;justify-content:center}
+.touch .b{display:flex}
+#jump{right:18px;bottom:90px}#place{right:90px;bottom:40px}#brk{right:18px;bottom:20px;background:#a006}#col{right:90px;bottom:120px}
+#joy{position:fixed;left:30px;bottom:30px;width:110px;height:110px;border-radius:50%;background:#0003;border:2px solid #fff6;display:none}
+.touch #joy{display:block}
+</style></head><body>
+<div id="cross"></div><div id="hot"></div><div id="ver"></div><div id="upd"></div>
+<div id="help">WASD move · Shift run · Space jump<br>Click = place · Right click = break · 1-6 / wheel = block</div>
+<div id="joy"></div>
+<div class="b" id="jump">JUMP</div><div class="b" id="place">PLACE</div><div class="b" id="brk">BREAK</div><div class="b" id="col">BLOCK</div>
+<script type="module" src="/src/main.js"></script>
+</body></html>
