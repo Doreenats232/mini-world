@@ -192,20 +192,23 @@ function addBlock(cx, cy, cz, t, doSave = true, anim = false) {
 }
 function delBlock(k) { const m = blockMeshes.get(k); if (!m) return; scene.remove(m); targets.splice(targets.indexOf(m), 1); blockMeshes.delete(k); solids.delete(k); queueSave(); }
 function queueSave() { clearTimeout(saveT); saveT = setTimeout(save, 400); }
-function save() { try { localStorage.setItem('mw_save', JSON.stringify({ b: [...blockMeshes.values()].map(m => [m.userData.cx, m.userData.cy, m.userData.cz, m.userData.c]), p: [P.pos.x, P.pos.y, P.pos.z, P.yaw], k: kills })); } catch (e) {} }
+function save() { try { localStorage.setItem('mw_save', JSON.stringify({ b: [...blockMeshes.values()].map(m => [m.userData.cx, m.userData.cy, m.userData.cz, m.userData.c]), p: [P.pos.x, P.pos.y, P.pos.z, P.yaw], k: kills, m: money, u: up, sg: hasShotgun })); } catch (e) {} }
 setInterval(() => save(), 10000); addEventListener('beforeunload', save);
 
 // ---------- player ----------
 const P = mkEnt(25, 1, 25, 0.35, 1.7); P.yaw = 0; P.pitch = 0; P.hp = 100;
 let kills = 0, mode = 'build', inCar = null, lastHurt = -99, flashV = 0, clock = 0;
+let money = 0, up = { dmg: 0, hp: 0, spd: 0 }, hasShotgun = false, weapon = 'pistol', shopOpen = false;
+const maxHp = () => 100 + 25 * up.hp;
 try {
   const s = JSON.parse(localStorage.getItem('mw_save') || 'null');
-  if (s) { s.b.forEach(b => addBlock(b[0], b[1], b[2], b[3], false)); P.pos.set(s.p[0], s.p[1], s.p[2]); P.yaw = s.p[3]; kills = s.k || 0; }
+  if (s) { s.b.forEach(b => addBlock(b[0], b[1], b[2], b[3], false)); P.pos.set(s.p[0], s.p[1], s.p[2]); P.yaw = s.p[3]; kills = s.k || 0; money = s.m || 0; if (s.u) up = { dmg: s.u.dmg || 0, hp: s.u.hp || 0, spd: s.u.spd || 0 }; hasShotgun = !!s.sg; }
 } catch (e) {}
 const keys = {}; const joy = { x: 0, y: 0 };
 function hud() {
-  $('hp').firstElementChild.style.width = Math.max(0, P.hp) + '%';
-  $('info').textContent = 'Kills ' + kills + '  ·  ' + (mode === 'fight' ? 'FIGHT' : 'BUILD: ' + BLOCKS[sel][0]) + ' (Q)';
+  $('hp').firstElementChild.style.width = Math.max(0, P.hp / maxHp() * 100) + '%';
+  $('info').textContent = '$' + money + '  ·  Kills ' + kills + '  ·  ' + (mode === 'fight' ? 'FIGHT: ' + weapon : 'BUILD: ' + BLOCKS[sel][0]) + ' (Q)';
+  $('col').textContent = mode === 'fight' ? 'GUN' : 'BLOCK';
   $('place').textContent = mode === 'fight' ? 'SHOOT' : 'PLACE';
   $('brk').textContent = mode === 'fight' ? 'PUNCH' : 'BREAK';
 }
@@ -213,9 +216,9 @@ selBlock(0);
 let msgT = 0;
 function msg(t, ms = 1800) { const m = $('msg'); m.textContent = t; m.style.display = 'block'; clearTimeout(msgT); msgT = setTimeout(() => m.style.display = 'none', ms); }
 function hurt(n) {
-  if (inCar) return;
+  if (inCar || shopOpen) return;
   P.hp -= n; lastHurt = clock; flashV = 0.45; sfx('hurt');
-  if (P.hp <= 0) { P.hp = 100; P.pos.set(25, 1, 25); P.vel.set(0, 0, 0); msg('YOU DIED'); sfx('die'); flashV = 0.8; }
+  if (P.hp <= 0) { P.hp = maxHp(); P.pos.set(25, 1, 25); P.vel.set(0, 0, 0); msg('YOU DIED'); sfx('die'); flashV = 0.8; }
   hud();
 }
 function jump() { if (P.ground) { P.vel.y = 11; P.ground = false; } }
@@ -224,12 +227,12 @@ function playerStep(dt) {
   const sin = Math.sin(P.yaw), cos = Math.cos(P.yaw);
   let mx = -sin * f + cos * s, mz = -cos * f - sin * s;
   const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; }
-  const sp = keys.ShiftLeft ? 12 : 7;
+  const sp = (keys.ShiftLeft ? 12 : 7) * (1 + 0.15 * up.spd);
   phys(P, mx * sp, mz * sp, dt);
   if (P.ground && (mx || mz)) { stepT -= dt; if (stepT <= 0) { sfx('step'); stepT = keys.ShiftLeft ? 0.28 : 0.42; } }
   if (P.pos.y < -50) P.pos.set(25, 3, 25);
   cam.position.set(P.pos.x, P.pos.y + 1.55, P.pos.z); cam.rotation.set(P.pitch, P.yaw, 0);
-  if (P.hp < 100 && clock - lastHurt > 5) { P.hp = Math.min(100, P.hp + 3 * dt); hud(); }
+  if (P.hp < maxHp() && clock - lastHurt > 5) { P.hp = Math.min(maxHp(), P.hp + 3 * dt); hud(); }
 }
 
 // ---------- cars ----------
@@ -245,6 +248,7 @@ function mkCar(x, z, h, col) {
 }
 mkCar(25, 45, 0, 0xd62828); mkCar(45, 25, Math.PI / 2, 0x2a9d8f); mkCar(-25, -5, 0, 0xf4a261); mkCar(75, -25, Math.PI / 2, 0x6a4c93);
 function toggleCar() {
+  if (!inCar && shopNear()) { openShop(); return; }
   if (inCar) { const c = inCar; inCar = null; c.speed = 0; stopEngine(); P.pos.set(c.pos.x + Math.cos(c.h) * 3, 0, c.pos.z - Math.sin(c.h) * 3); P.vel.set(0, 0, 0); P.yaw = c.h + Math.PI; P.pitch = 0; return; }
   let best = null, bd = 5;
   for (const c of cars) { const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; best = c; } }
@@ -289,7 +293,7 @@ function spawnEnemy() {
 function damageEnemy(e, n, quiet) {
   if (e.dead) return;
   e.hp -= n; e.hurt = 0.12; sfxAt(e.pos, 'hit');
-  if (e.hp <= 0) { sfxAt(e.pos, 'edie'); e.dead = true; scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); if (!quiet) { kills++; hud(); } }
+  if (e.hp <= 0) { sfxAt(e.pos, 'edie'); e.dead = true; scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); if (!quiet) { kills++; money += 25; hud(); } }
 }
 function enemyStep(e, dt) {
   let T = inCar ? inCar.pos : P.pos, npc = null;
@@ -651,11 +655,16 @@ function tracer(to) {
   const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xffee88 })); scene.add(l); setTimeout(() => { scene.remove(l); g.dispose(); }, 70);
 }
 function shoot() {
-  if (cool > 0) return; cool = 0.25; sfx('shoot');
-  cam.updateMatrixWorld(); gun.setFromCamera({ x: 0, y: 0 }, cam);
-  const h = gun.intersectObjects([...targets, ...enemyMeshes], false)[0];
-  tracer(h ? h.point : gun.ray.at(70, new V3()));
-  if (h && h.object.userData.enemy) damageEnemy(h.object.userData.enemy, h.object.userData.head ? 60 : 25);
+  if (cool > 0) return;
+  cam.updateMatrixWorld(); const dm = 1 + 0.25 * up.dmg, sg = weapon === 'shotgun';
+  cool = sg ? 0.7 : 0.25; sfx('shoot'); if (sg) sfx('punch');
+  gun.far = sg ? 30 : 70;
+  for (let i = 0; i < (sg ? 7 : 1); i++) {
+    gun.setFromCamera({ x: sg ? (Math.random() - 0.5) * 0.14 : 0, y: sg ? (Math.random() - 0.5) * 0.14 : 0 }, cam);
+    const h = gun.intersectObjects([...targets, ...enemyMeshes], false)[0];
+    tracer(h ? h.point : gun.ray.at(gun.far, new V3()));
+    if (h && h.object.userData.enemy) damageEnemy(h.object.userData.enemy, (h.object.userData.head ? (sg ? 28 : 60) : (sg ? 14 : 25)) * dm);
+  }
 }
 function punch() {
   if (cool > 0) return; cool = 0.4; sfx('punch');
@@ -685,10 +694,12 @@ $('relsave').addEventListener('click', () => {
 const cv = ren.domElement;
 addEventListener('keydown', e => {
   if (typing()) return;
+  if (shopOpen) { if (e.code === 'Escape' || e.code === 'KeyE') closeShop(); return; }
   keys[e.code] = true;
   if (e.code === 'Space') { if (!inCar) jump(); e.preventDefault(); }
   if (e.code === 'KeyQ') toggleMode();
   if (e.code === 'KeyM') toggleMute();
+  if (e.code === 'KeyR') swapWeapon();
   if (e.code === 'KeyE') toggleCar();
   if (e.code === 'KeyT') { e.preventDefault(); openChat(); }
   if (e.code === 'KeyF' && !inCar) punch();
@@ -708,8 +719,8 @@ if (!isTouch) {
 // ---------- input: touch ----------
 const tch = {};
 function btn(id, fn) { $(id).addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); fn(); }, { passive: false }); }
-btn('jump', () => { if (!inCar) jump(); }); btn('place', act1); btn('brk', act2); btn('col', () => selBlock(sel + 1)); btn('mode', toggleMode); btn('car', toggleCar); btn('chatbtn', openChat);
-const uiTarget = t => t.closest && t.closest('#chatbar,#panel,#gear,#mute,.b');
+btn('jump', () => { if (!inCar) jump(); }); btn('place', act1); btn('brk', act2); btn('col', colAct); btn('mode', toggleMode); btn('car', toggleCar); btn('chatbtn', openChat);
+const uiTarget = t => t.closest && t.closest('#chatbar,#panel,#shop,#gear,#mute,.b');
 addEventListener('touchstart', e => { for (const t of e.changedTouches) { if (uiTarget(t.target)) continue; tch[t.identifier] = { x: t.clientX, y: t.clientY, mode: t.clientX < innerWidth / 2 ? 'joy' : 'look' }; } }, { passive: false });
 addEventListener('touchmove', e => {
   if (!uiTarget(e.target)) e.preventDefault();
@@ -754,6 +765,60 @@ function updateSky(dt) {
 setInterval(() => { const h = Math.floor(dayT * 24), m = Math.floor((dayT * 24 - h) * 60); $('ver').textContent = 'v' + VER + ' · ' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }, 1000);
 updateSky(0);
 
+// ---------- shop ----------
+const SHOP = { x: 36, z: 22 };
+let hintOn = false;
+$('hint').textContent = isTouch ? 'Tap CAR button: open shop' : 'Press E: open shop';
+(function () {
+  const g = new THREE.Group(), M = c => new THREE.MeshLambertMaterial({ color: c });
+  const base = new THREE.Mesh(new THREE.BoxGeometry(5, 0.3, 5), M(0x555a60)); base.position.y = 0.15; g.add(base);
+  for (const [x, z] of [[-2.2, -2.2], [2.2, -2.2], [-2.2, 2.2], [2.2, 2.2]]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.2, 0.3), M(0xdddddd)); p.position.set(x, 1.8, z); g.add(p); }
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.4, 5.6), M(0xc0392b)); roof.position.y = 3.6; g.add(roof);
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(3, 1.1, 1), M(0x8b5a2b)); counter.position.set(0, 0.85, -1); g.add(counter);
+  const sc = document.createElement('canvas'); sc.width = 256; sc.height = 128; const sg = sc.getContext('2d');
+  sg.fillStyle = '#d4a017'; sg.fillRect(0, 0, 256, 128); sg.fillStyle = '#111'; sg.font = 'bold 60px sans-serif'; sg.textAlign = 'center'; sg.fillText('$ SHOP', 128, 84);
+  const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: st })); sp.scale.set(5, 2.5, 1); sp.position.y = 5.4; g.add(sp);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 40, 10, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd400, transparent: true, opacity: 0.25, depthWrite: false })); beam.position.y = 20; g.add(beam);
+  g.position.set(SHOP.x, 0, SHOP.z); scene.add(g);
+})();
+const shopNear = () => dist2(P.pos, SHOP) < 5;
+function spawnCarNearby() {
+  for (const a of [0, 1.57, -1.57, 3.14]) {
+    const x = P.pos.x - Math.sin(P.yaw + a) * 8, z = P.pos.z - Math.cos(P.yaw + a) * 8, t = { pos: new V3(x, 0, z), R: 2, H: 1.2 };
+    let bad = false; for (const b of solids.values()) if (hit(t, b)) { bad = true; break; }
+    if (!bad) { mkCar(x, z, P.yaw + a + Math.PI, [0xff6b6b, 0x4dabf7, 0xffd43b, 0x69db7c, 0xda77f2][Math.floor(Math.random() * 5)]); return true; }
+  }
+  return false;
+}
+function swapWeapon() { if (!hasShotgun) { msg('Buy the shotgun at the shop', 1500); return; } weapon = weapon === 'pistol' ? 'shotgun' : 'pistol'; hud(); }
+function colAct() { if (mode === 'fight') swapWeapon(); else selBlock(sel + 1); }
+const ITEMS = [
+  { name: 'Health pack', desc: 'Restore full health', cost: () => 50, can: () => P.hp < maxHp(), buy: () => { P.hp = maxHp(); } },
+  { name: 'Gun damage +25%', desc: () => 'Level ' + up.dmg + '/3', cost: () => 150 + 100 * up.dmg, can: () => up.dmg < 3, buy: () => { up.dmg++; } },
+  { name: 'Max health +25', desc: () => 'Level ' + up.hp + '/3', cost: () => 200 + 150 * up.hp, can: () => up.hp < 3, buy: () => { up.hp++; P.hp = maxHp(); } },
+  { name: 'Run speed +15%', desc: () => 'Level ' + up.spd + '/2', cost: () => 150 + 100 * up.spd, can: () => up.spd < 2, buy: () => { up.spd++; } },
+  { name: 'Shotgun', desc: 'Press R (or GUN button) in fight mode', cost: () => 300, can: () => !hasShotgun, buy: () => { hasShotgun = true; weapon = 'shotgun'; } },
+  { name: 'Supplies for NPCs', desc: '+40 wood, +30 stone, +15 sand each', cost: () => 120, can: () => true, buy: () => { for (const n of npcs) { n.inv.wood = Math.min(60, n.inv.wood + 40); n.inv.stone = Math.min(60, n.inv.stone + 30); n.inv.sand = Math.min(60, n.inv.sand + 15); } ev('You gave the crew supplies from the shop'); } },
+  { name: 'New car', desc: 'Delivered next to you', cost: () => 200, can: () => true, buy: () => spawnCarNearby() },
+];
+function renderShop() {
+  $('shopmoney').textContent = '$' + money;
+  const box = $('shopitems'); box.innerHTML = '';
+  for (const it of ITEMS) {
+    const row = document.createElement('div'); row.className = 'srow';
+    const cost = it.cost(), ok = it.can();
+    const info = document.createElement('div'); info.innerHTML = '<b></b><br><small></small>';
+    info.firstChild.textContent = it.name; info.lastChild.textContent = typeof it.desc === 'function' ? it.desc() : it.desc;
+    const b = document.createElement('button'); b.textContent = ok ? '$' + cost : 'MAX'; b.disabled = !ok || money < cost;
+    b.onclick = () => { if (money < cost || !it.can()) return; if (it.buy() === false) { msg('No room for that here', 1200); return; } money -= cost; sfx('place'); save(); hud(); renderShop(); };
+    row.append(info, b); box.appendChild(row);
+  }
+}
+function openShop() { shopOpen = true; for (const k in keys) keys[k] = false; document.exitPointerLock && document.exitPointerLock(); renderShop(); $('shop').style.display = 'block'; }
+function closeShop() { shopOpen = false; $('shop').style.display = 'none'; }
+$('shopclose').addEventListener('click', closeShop);
+
 // ---------- minimap ----------
 const mini = $('mini'), mg = mini.getContext('2d'), MS = isTouch ? 110 : 150, MR = 70;
 mini.width = mini.height = MS * 2; mini.style.width = mini.style.height = MS + 'px';
@@ -773,6 +838,7 @@ function drawMini() {
   const dot = (x, z, col, r, clamp) => { const [sx, sy, inside] = toS(x, z, clamp); if (!inside && !clamp) return; mg.fillStyle = col; mg.beginPath(); mg.arc(sx, sy, r, 0, 6.2832); mg.fill(); };
   for (const nd of nodes) if (nd.left > 0) dot(nd.pos.x, nd.pos.z, nd.type === 'wood' ? '#2ecc40' : nd.type === 'stone' ? '#e0e0e0' : '#f1c40f', 4, false);
   for (const e of enemies) if (!e.dead) dot(e.pos.x, e.pos.z, '#ff3b30', 5, false);
+  dot(SHOP.x, SHOP.z, '#ffd400', 7, true);
   for (const cr of cars) { const [sx, sy, inside] = toS(cr.pos.x, cr.pos.z); if (inside) { mg.fillStyle = '#fff'; mg.fillRect(sx - 4, sy - 4, 8, 8); } }
   for (const n of npcs) { const [sx, sy] = toS(n.pos.x, n.pos.z, true); mg.fillStyle = '#' + n.col.toString(16).padStart(6, '0'); mg.beginPath(); mg.arc(sx, sy, 8, 0, 6.2832); mg.fill(); mg.strokeStyle = '#fff'; mg.lineWidth = 2; mg.stroke(); mg.fillStyle = '#fff'; mg.font = 'bold 12px sans-serif'; mg.textAlign = 'center'; mg.fillText(n.name[0], sx, sy + 4); }
   mg.fillStyle = '#fff'; mg.beginPath(); mg.moveTo(c, c - 12); mg.lineTo(c - 8, c + 9); mg.lineTo(c + 8, c + 9); mg.closePath(); mg.fill();
@@ -789,6 +855,7 @@ let last = performance.now(), spawnT = 0;
 ren.setAnimationLoop(now => {
   const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
   updateSky(dt);
+  { const nr = !inCar && !shopOpen && shopNear(); if (nr !== hintOn) { hintOn = nr; $('hint').style.display = nr ? 'block' : 'none'; } }
   miniT -= dt; if (miniT <= 0) { miniT = 0.066; drawMini(); }
   if (inCar) driveCar(dt); else playerStep(dt);
   if (held && mode === 'fight' && !inCar) shoot();
