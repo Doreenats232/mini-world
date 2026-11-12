@@ -754,6 +754,33 @@ function updateSky(dt) {
 setInterval(() => { const h = Math.floor(dayT * 24), m = Math.floor((dayT * 24 - h) * 60); $('ver').textContent = 'v' + VER + ' · ' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }, 1000);
 updateSky(0);
 
+// ---------- minimap ----------
+const mini = $('mini'), mg = mini.getContext('2d'), MS = isTouch ? 110 : 150, MR = 70;
+mini.width = mini.height = MS * 2; mini.style.width = mini.style.height = MS + 'px';
+let miniT = 0;
+function drawMini() {
+  const S = MS * 2, c = S / 2, sc = c / MR, yaw = inCar ? inCar.h + Math.PI : P.yaw, cs = Math.cos(yaw), sn = Math.sin(yaw), px = P.pos.x, pz = P.pos.z, lim = MR + 25;
+  mg.clearRect(0, 0, S, S); mg.save(); mg.beginPath(); mg.arc(c, c, c - 2, 0, 6.2832); mg.clip();
+  mg.fillStyle = '#35592b'; mg.fillRect(0, 0, S, S);
+  mg.translate(c, c); mg.rotate(yaw); mg.scale(sc, sc); mg.translate(-px, -pz);
+  mg.fillStyle = '#3a3a3d'; for (let k = -8; k <= 7; k++) { mg.fillRect(k * 50 + 18, -400, 14, 800); mg.fillRect(-400, k * 50 + 18, 800, 14); }
+  mg.fillStyle = '#8a8f98';
+  for (const [k, b] of solids) { if (k[0] !== 'b') continue; if (Math.abs((b.min.x + b.max.x) / 2 - px) > lim || Math.abs((b.min.z + b.max.z) / 2 - pz) > lim) continue; mg.fillRect(b.min.x, b.min.z, b.max.x - b.min.x, b.max.z - b.min.z); }
+  mg.fillStyle = '#d4a85f';
+  for (const m of blockMeshes.values()) { const x = m.position.x, z = m.position.z; if (Math.abs(x - px) > lim || Math.abs(z - pz) > lim) continue; mg.fillRect(x - 1, z - 1, 2, 2); }
+  mg.setTransform(1, 0, 0, 1, 0, 0);
+  const toS = (x, z, clamp) => { const dx = x - px, dz = z - pz; let sx = (dx * cs - dz * sn) * sc, sy = (dx * sn + dz * cs) * sc; const d = Math.hypot(sx, sy), mx = c - 10; if (clamp && d > mx) { sx *= mx / d; sy *= mx / d; } return [c + sx, c + sy, d <= c - 4]; };
+  const dot = (x, z, col, r, clamp) => { const [sx, sy, inside] = toS(x, z, clamp); if (!inside && !clamp) return; mg.fillStyle = col; mg.beginPath(); mg.arc(sx, sy, r, 0, 6.2832); mg.fill(); };
+  for (const nd of nodes) if (nd.left > 0) dot(nd.pos.x, nd.pos.z, nd.type === 'wood' ? '#2ecc40' : nd.type === 'stone' ? '#e0e0e0' : '#f1c40f', 4, false);
+  for (const e of enemies) if (!e.dead) dot(e.pos.x, e.pos.z, '#ff3b30', 5, false);
+  for (const cr of cars) { const [sx, sy, inside] = toS(cr.pos.x, cr.pos.z); if (inside) { mg.fillStyle = '#fff'; mg.fillRect(sx - 4, sy - 4, 8, 8); } }
+  for (const n of npcs) { const [sx, sy] = toS(n.pos.x, n.pos.z, true); mg.fillStyle = '#' + n.col.toString(16).padStart(6, '0'); mg.beginPath(); mg.arc(sx, sy, 8, 0, 6.2832); mg.fill(); mg.strokeStyle = '#fff'; mg.lineWidth = 2; mg.stroke(); mg.fillStyle = '#fff'; mg.font = 'bold 12px sans-serif'; mg.textAlign = 'center'; mg.fillText(n.name[0], sx, sy + 4); }
+  mg.fillStyle = '#fff'; mg.beginPath(); mg.moveTo(c, c - 12); mg.lineTo(c - 8, c + 9); mg.lineTo(c + 8, c + 9); mg.closePath(); mg.fill();
+  mg.restore();
+  mg.strokeStyle = '#fff'; mg.lineWidth = 3; mg.beginPath(); mg.arc(c, c, c - 2, 0, 6.2832); mg.stroke();
+  const [nx, ny] = toS(px, pz - MR * 0.82); mg.fillStyle = '#ffd400'; mg.font = 'bold 16px sans-serif'; mg.textAlign = 'center'; mg.fillText('N', nx, ny + 5);
+}
+
 // ---------- loop ----------
 hud();
 for (let i = 0; i < 6; i++) spawnEnemy();
@@ -762,6 +789,7 @@ let last = performance.now(), spawnT = 0;
 ren.setAnimationLoop(now => {
   const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
   updateSky(dt);
+  miniT -= dt; if (miniT <= 0) { miniT = 0.066; drawMini(); }
   if (inCar) driveCar(dt); else playerStep(dt);
   if (held && mode === 'fight' && !inCar) shoot();
   for (let i = enemies.length - 1; i >= 0; i--) { if (enemies[i].dead) enemies.splice(i, 1); else enemyStep(enemies[i], dt); }
