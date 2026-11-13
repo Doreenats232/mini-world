@@ -368,7 +368,7 @@ function mkNpc(d) {
   const bub = document.createElement('div'); bub.className = 'bub'; const nm = document.createElement('div'); const st = document.createElement('div'); st.className = 'st';
   nm.innerHTML = '<b></b> <small></small>'; nm.firstChild.textContent = d.name; nm.lastChild.textContent = '(' + d.role + ')';
   el.append(bub, nm, st); $('labels').appendChild(el);
-  npcs.push({ ...mkEnt(d.x, 0, d.z, 0.4, 1.9), ...d, mesh: g, aL, aR, el, bub, st, hp: 80, inv: { wood: 0, stone: 0, sand: 0 }, task: null, sub: null, status: 'standing by', last: 'just arrived', stuck: 0, work: 0, cd: 0, bubT: 0, idleT: 0, swing: 0, face: 0, home: { x: d.x, z: d.z }, walking: false, working: false });
+  npcs.push({ ...mkEnt(d.x, 0, d.z, 0.4, 1.9), ...d, mesh: g, aL, aR, el, bub, st, hp: 80, inv: { wood: 0, stone: 0, sand: 0 }, task: null, sub: null, queue: [], status: 'standing by', last: 'just arrived', stuck: 0, work: 0, cd: 0, bubT: 0, idleT: 0, swing: 0, face: 0, home: { x: d.x, z: d.z }, walking: false, working: false });
 }
 NPCDEF.forEach(mkNpc);
 const nearestNpc = pos => { let b = null, bd = 1e9; for (const n of npcs) { const d = dist2(n.pos, pos); if (d < bd) { bd = d; b = n; } } return b; };
@@ -377,7 +377,7 @@ function logLine(txt, cls) { const d = document.createElement('div'); d.textCont
 let events = [];
 const ev = t => { events.push(t); logLine('· ' + t, 'ev'); };
 function say(n, t) { t = String(t || '').slice(0, 220); if (!t) return; n.bub.textContent = t; n.bubT = 6 + t.length / 18; logLine(n.name + ': ' + t); }
-function npcHurt(n, d) { n.hp -= d; if (n.hp <= 0) { n.hp = 80; n.pos.set(n.home.x, 0, n.home.z); n.task = null; n.sub = null; n.last = 'was knocked out and woke up at home'; ev(n.name + ' was knocked out by thugs and woke up at home'); } }
+function npcHurt(n, d) { n.hp -= d; if (n.hp <= 0) { dropTask(n); n.hp = 80; n.pos.set(n.home.x, 0, n.home.z); n.task = null; n.sub = null; n.last = 'was knocked out and woke up at home'; ev(n.name + ' was knocked out by thugs and woke up at home'); } }
 
 // ---- plan expansion (architecture DSL) ----
 function expandPlan(plan) {
@@ -434,15 +434,25 @@ function cellFree(cx, cy, cz) {
   for (const e of enemies) if (!e.dead && hit(e, b)) return false;
   return true;
 }
-function remainingNeed(t) { const need = { wood: 0, stone: 0, sand: 0 }; for (let i = t.i; i < t.cells.length; i++) need[COSTRES(t.cells[i].t)]++; return need; }
+const has = c => blockMeshes.has(c.cx + ',' + c.cy + ',' + c.cz);
+const isGuard = n => n.role === 'guard' || (n.task && (n.task.type === 'guard' || n.task.type === 'protect'));
+function dropTask(n) { if (n.task && n.task.cur && n.task.st) { n.task.st.retry.push(n.task.cur); n.task.cur = null; } }
+function remainingNeed(t) { const need = { wood: 0, stone: 0, sand: 0 }, st = t.st, add = c => { need[COSTRES(c.t)]++; }; if (t.cur) add(t.cur); for (let i = st.next; i < st.cells.length; i++) add(st.cells[i]); st.retry.forEach(add); return need; }
 
 function setTask(n, t) {
   if (!t || typeof t !== 'object') return;
   const type = String(t.type || '').toLowerCase();
-  n.sub = null; n.gnode = null; n.work = 0;
+  dropTask(n); n.sub = null; n.gnode = null; n.work = 0;
   if (type === 'idle' || type === 'stop') { n.task = null; n.status = 'standing by'; return; }
   if (type === 'wander') { n.task = { type: 'wander', wt: 0, tx: n.pos.x, tz: n.pos.z }; return; }
   if (type === 'follow' || type === 'guard') { n.task = { type }; return; }
+  if (type === 'protect') { n.task = { type: 'protect', who: String(t.who || '').toLowerCase() }; return; }
+  if (type === 'assist') {
+    const who = npcs.find(o => o !== n && o.id === String(t.with || '').toLowerCase() && o.task && o.task.st && o.task.st.status === 'building');
+    const st = who ? who.task.st : structures.find(x => x.status === 'building');
+    if (!st) { ev(n.name + ' has nothing to help with'); return; }
+    n.task = { type: 'assist', st, cur: null, stuckSkip: 0 }; ev(`${n.name} joined the build of ${st.name}`); return;
+  }
   if (type === 'gather') {
     const res = String(t.resource || t.res || 'wood').toLowerCase(); if (!(res in n.inv)) { ev(n.name + ': unknown resource ' + res); return; }
     n.task = { type: 'gather', res, amount: Math.max(1, Math.min(60, Math.round(+t.amount || 20))) }; return;
@@ -462,9 +472,9 @@ function setTask(n, t) {
     const rot = rotCells(norm, r), ox = site.x0 + Math.floor((S - rot.W) / 2), oz = site.z0 + Math.floor((S - rot.D) / 2);
     const cells = rot.cells.map(c => ({ cx: ox + c.x, cy: c.y, cz: oz + c.z, t: c.t })).sort((a, b) => a.cy - b.cy || a.cz - b.cz || a.cx - b.cx);
     reserved.push(new THREE.Box3(new V3(site.x0 * 2 - 2, 0, site.z0 * 2 - 2), new V3((site.x0 + S) * 2 + 2, 60, (site.z0 + S) * 2 + 2)));
-    const st = { name: String(t.name || 'Building').slice(0, 30), by: n.name, status: 'building', done: 0, total: cells.length };
+    const st = { name: String(t.name || 'Building').slice(0, 30), by: n.name, status: 'building', done: 0, total: cells.length, cells, next: 0, retry: [] };
     structures.push(st);
-    n.task = { type: 'build', st, cells, i: 0, cx: cxm, cz: czm, stuckSkip: 0 };
+    n.task = { type: 'build', st, cur: null, stuckSkip: 0 };
     const need = remainingNeed(n.task);
     ev(`${n.name} planned "${st.name}": ${cells.length} blocks (wood ${need.wood}, stone ${need.stone}, sand ${need.sand})`);
     return;
@@ -495,43 +505,49 @@ function doGather(n, res, amount, dt) {
   if (n.work >= 0.5) { n.work = 0; sfxAt(nd.pos, res === 'wood' ? 'chop' : 'mine'); nd.left--; n.inv[res]++; nd.mesh.scale.setScalar(0.45 + 0.55 * nd.left / nd.max); if (nd.left <= 0) nd.mesh.visible = false; }
   return 'busy';
 }
-function finish(n, text) { n.last = text; ev(n.name + ' ' + text); n.task = null; n.sub = null; n.gnode = null; n.working = false; n.idleT = 0; n.status = 'standing by'; }
+function finish(n, text) { n.last = text; ev(n.name + ' ' + text); n.task = null; n.sub = null; n.gnode = null; n.working = false; n.idleT = 0; n.status = 'standing by'; if (n.queue.length) setTask(n, n.queue.shift()); }
 function npcStep(n, dt) {
   n.walking = false; n.working = false; n.cd -= dt;
-  const foe = nearestEnemy(n.pos, n.role === 'guard' || (n.task && n.task.type === 'guard') ? 16 : 3.2);
+  const foe = nearestEnemy(n.pos, isGuard(n) ? 16 : 3.2);
   if (foe) {
     const d = dist2(foe.pos, n.pos);
-    if (d > 2.2) { if (n.role === 'guard' || (n.task && n.task.type === 'guard')) { walkTo(n, foe.pos.x, foe.pos.z, dt, 1.8, 5.8); n.status = 'fighting thugs'; return; } }
+    if (d > 2.2) { if (isGuard(n)) { walkTo(n, foe.pos.x, foe.pos.z, dt, 1.8, 5.8); n.status = 'fighting thugs'; return; } }
     else { n.face = Math.atan2(foe.pos.x - n.pos.x, foe.pos.z - n.pos.z); if (n.cd <= 0) { n.cd = 0.6; n.swing = 0.25; sfxAt(n.pos, 'punch'); damageEnemy(foe, n.role === 'guard' ? 25 : 12, true); } n.status = 'fighting'; phys(n, 0, 0, dt); return; }
   }
   const t = n.task;
   if (!t) { phys(n, 0, 0, dt); n.idleT += dt; const dp = dist2(P.pos, n.pos); if (dp < 12) n.face = Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z); return; }
   if (t.type === 'wander') { t.wt -= dt; if (t.wt <= 0) { const a = Math.random() * 6.28; t.tx = n.pos.x + Math.cos(a) * 14; t.tz = n.pos.z + Math.sin(a) * 14; t.wt = 5; } walkTo(n, t.tx, t.tz, dt, 1, 2.5); n.status = 'wandering'; return; }
   if (t.type === 'follow' || t.type === 'guard') { walkTo(n, P.pos.x, P.pos.z, dt, t.type === 'guard' ? 6 : 3.5, 6); n.status = t.type === 'guard' ? 'guarding you' : 'following you'; return; }
+  if (t.type === 'protect') { const o = npcs.find(x => x.id === t.who && x !== n), tp = o ? o.pos : P.pos; walkTo(n, tp.x, tp.z, dt, 6, 6); n.status = 'protecting ' + (o ? o.name : 'you'); return; }
   if (t.type === 'gather') { const r = doGather(n, t.res, t.amount, dt); if (r === 'done') finish(n, `finished gathering ${t.amount} ${t.res}`); else if (r === 'none') finish(n, `found no ${t.res} left in the world`); return; }
-  if (t.type === 'build') {
-    if (n.sub) { // fetching material
+  if (t.type === 'build' || t.type === 'assist') {
+    const st = t.st;
+    if (n.sub) {
       const r = doGather(n, n.sub.res, n.sub.amount, dt);
-      if (r === 'done') { n.sub = null; } else if (r === 'none') { finish(n, `ran out of ${n.sub.res} nodes while building ${t.st.name}`); t.st.status = 'stalled'; };
+      if (r === 'done') n.sub = null; else if (r === 'none') { const rs = n.sub.res; dropTask(n); if (t.type === 'build') st.status = 'stalled'; finish(n, `ran out of ${rs} nodes while building ${st.name}`); }
       return;
     }
-    while (t.i < t.cells.length && blockMeshes.has(t.cells[t.i].cx + ',' + t.cells[t.i].cy + ',' + t.cells[t.i].cz)) t.i++;
-    t.st.done = t.i;
-    if (t.i >= t.cells.length) { t.st.status = 'complete'; finish(n, `finished building ${t.st.name}`); return; }
-    const c = t.cells[t.i], res = COSTRES(c.t);
+    if (!t.cur) {
+      if (st.retry.length) t.cur = st.retry.shift();
+      else { while (st.next < st.cells.length && has(st.cells[st.next])) { st.next++; st.done++; } if (st.next < st.cells.length) t.cur = st.cells[st.next++]; }
+    }
+    if (!t.cur) {
+      if (!npcs.some(o => o !== n && o.task && o.task.st === st && o.task.cur)) st.status = 'complete';
+      finish(n, (t.type === 'assist' ? 'helped finish ' : 'finished building ') + st.name); return;
+    }
+    const c = t.cur, res = COSTRES(c.t);
     if (n.inv[res] < 1) {
-      const need = remainingNeed(t)[res], amount = Math.min(60, n.inv[res] + Math.max(5, need));
-      n.sub = { res, amount }; n.gnode = null; ev(`${n.name} needs ${need} more ${res} for ${t.st.name}, going to gather`); return;
+      const need = Math.ceil(remainingNeed(t)[res] / Math.max(1, npcs.filter(o => o.task && o.task.st === st).length)), amount = Math.min(60, n.inv[res] + Math.max(5, need));
+      n.sub = { res, amount }; n.gnode = null; ev(`${n.name} needs ${need} more ${res} for ${st.name}, going to gather`); return;
     }
     const wx = c.cx * 2 + 1, wz = c.cz * 2 + 1;
-    n.status = `building ${t.st.name} ${t.i}/${t.cells.length}`;
+    n.status = `${t.type === 'assist' ? 'helping build' : 'building'} ${st.name} ${st.done}/${st.total}`;
     if (dist2(n.pos, { x: wx, z: wz }) > 6.5 || Math.abs(n.pos.y - c.cy * 2) > 9) { walkTo(n, wx, wz, dt, 5); return; }
     phys(n, 0, 0, dt); n.working = true; n.face = Math.atan2(wx - n.pos.x, wz - n.pos.z); n.work += dt;
     if (n.work >= 0.35) {
-      if (!cellFree(c.cx, c.cy, c.cz)) { t.stuckSkip += 0.35; if (t.stuckSkip > 4) { t.stuckSkip = 0; t.i++; } n.work = 0.3; return; }
-      n.work = 0; t.stuckSkip = 0; addBlock(c.cx, c.cy, c.cz, c.t, true, true); sfxAt(n.pos, 'npcplace'); n.inv[res]--; t.i++;
-      const g = new THREE.BufferGeometry().setFromPoints([new V3(n.pos.x, n.pos.y + 1.4, n.pos.z), new V3(wx, c.cy * 2 + 1, wz)]);
-      const ln = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x66ddff })); scene.add(ln); setTimeout(() => { scene.remove(ln); g.dispose(); }, 120);
+      if (!cellFree(c.cx, c.cy, c.cz)) { t.stuckSkip += 0.35; if (t.stuckSkip > 4) { t.stuckSkip = 0; st.done++; t.cur = null; } n.work = 0.3; return; }
+      n.work = 0; t.stuckSkip = 0; addBlock(c.cx, c.cy, c.cz, c.t, true, true); sfxAt(n.pos, 'npcplace'); n.inv[res]--; st.done++; t.cur = null;
+      beam(new V3(n.pos.x, n.pos.y + 1.4, n.pos.z), new V3(wx, c.cy * 2 + 1, wz), 0x66ddff, 120);
     }
   }
 }
@@ -554,7 +570,8 @@ try { const s = JSON.parse(localStorage.getItem('mw_relay') || 'null'); if (s) R
 const SYS = `You control 3 NPC characters (archie=architect, mason=builder, ranger=guard) in a 3D voxel sandbox city game. Reply with ONE JSON object only. No markdown, no text outside the JSON.
 WORLD: 1 block = 2m. N=-z, S=+z, E=+x, W=-x. Resources: wood (trees), stone (rocks), sand (sand piles). Blocks and cost (1 material per block): planks=wood, roof=wood, stone=stone, brick=stone, concrete=stone, glass=sand. NPCs must gather materials before building; the game automatically walks them to resource nodes, gathers, and goes back to building. Hostile thugs roam the roads; guards fight them. A human PLAYER chats with you. Listen to player_message, act on reasonable requests, and REFUSE (explain briefly, give no task) if it is unsafe, impossible, pointless, or against your personality. You may ask questions, negotiate, joke, report what you see. Keep "say" under 140 characters, in character. "thought" = your short reasoning (1-2 sentences): what you see, what materials you need vs have, why this design.
 REPLY FORMAT: {"npcs":[{"id":"archie","thought":"...","say":"...","task":{...}}]}  Include only NPCs that speak or change task. Omit task to keep the current one.
-TASKS: {"type":"idle"} {"type":"wander"} {"type":"follow"} {"type":"guard"} {"type":"gather","resource":"wood|stone|sand","amount":20} {"type":"build","name":"Cottage","where":"near_player|near_me","dx":0,"dz":0,"plan":[ops]} (dx,dz optional offset in meters from the reference point).
+TASKS: {"type":"idle"} {"type":"wander"} {"type":"follow"} {"type":"guard"} {"type":"gather","resource":"wood|stone|sand","amount":20} {"type":"build","name":"Cottage","where":"near_player|near_me","dx":0,"dz":0,"plan":[ops]} (dx,dz optional offset in meters from the reference point). {"type":"assist","with":"archie"} joins another NPC's build and splits the blocks with them. {"type":"protect","who":"archie"} guards a teammate and fights thugs near them. Any NPC entry may include "then":[task,...] (max 4) to queue follow-up tasks.
+TEAMWORK: act as a crew, not as individuals. The architect designs and starts a build; builders ASSIST (blocks and material gathering are shared, so it goes faster); the guard PROTECTS the builders. React to teammates' events. If the player asks for something big (a village, a base), split it into several buildings across NPCs and queue follow-ups.
 PLAN OPS (integer cells; x,z horizontal; y up; y=0 is the ground layer; stay within 24x16x24): {"op":"box","x":0,"y":0,"z":0,"w":6,"h":3,"d":6,"block":"brick","hollow":true} (hollow = walls only); {"op":"fill","x","y","z","w","h","d","block"}; {"op":"roof","x","y","z","w","d","block","style":"gable|flat"} (gable ridge runs along x); {"op":"hole","x","y","z","w","h","d"} deletes cells (doors, windows); {"op":"block","x","y","z","block"}; {"op":"floor","x","y","z","w","d","block"}. Later ops override earlier ones. The wall at z=0 is the FRONT; the game rotates the building so the front faces the player.
 ARCHITECTURE RULES: design real buildings with walls, a door (hole 1 wide 1 high at ground level in the front wall), windows (glass fill at y=1), and a roof covering all walls (roof y = wall height). Sensible sizes (house about 6x3x6 cells). Nothing floating. Pick materials that match what you have and what resource nodes are near, and say why.
 EXAMPLE house: [{"op":"box","x":0,"y":0,"z":0,"w":6,"h":3,"d":6,"block":"brick","hollow":true},{"op":"hole","x":2,"y":0,"z":0,"w":1,"h":1,"d":1},{"op":"fill","x":1,"y":1,"z":0,"w":1,"h":1,"d":1,"block":"glass"},{"op":"fill","x":4,"y":1,"z":0,"w":1,"h":1,"d":1,"block":"glass"},{"op":"roof","x":0,"y":3,"z":0,"w":6,"d":6,"block":"roof","style":"gable"}]`;
@@ -566,7 +583,7 @@ function stateJSON(m) {
   return JSON.stringify({
     time: Math.round(clock), player: { at: [Math.round(P.pos.x), Math.round(P.pos.z)], hp: Math.round(P.hp), mode, inCar: !!inCar },
     npcs: npcs.map(n => ({ id: n.id, role: n.role, personality: n.pers, at: [Math.round(n.pos.x), Math.round(n.pos.z)], hp: Math.round(n.hp), inv: n.inv, doing: n.status, task: n.task ? n.task.type : 'idle', last: n.last, playerIs: { m: Math.round(dist2(n.pos, P.pos)), dir: dirName(n.pos, P.pos) }, nearestNodes: nn(n), thugsWithin25m: enemies.filter(e => !e.dead && dist2(e.pos, n.pos) < 25).length })),
-    structures: structures.map(s => ({ name: s.name, by: s.by, status: s.status, progress: s.done + '/' + s.total })),
+    structures: structures.map(s => ({ name: s.name, by: s.by, status: s.status, progress: s.done + '/' + s.total, workers: npcs.filter(o => o.task && o.task.st === s).map(o => o.name) })),
     events: events.splice(0, 14), player_message: m || null,
   });
 }
@@ -586,7 +603,8 @@ function applyAI(j) {
     if (!n) continue;
     if (o.thought) logLine('💭 ' + n.name + ': ' + String(o.thought).slice(0, 260), 'th');
     if (o.say) say(n, o.say);
-    if (o.task) setTask(n, o.task);
+    if (o.task) { n.queue = []; setTask(n, o.task); }
+    if (Array.isArray(o.then)) n.queue = o.then.filter(x => x && x.type).slice(0, 4);
   }
 }
 async function callAI(m) {
@@ -610,7 +628,10 @@ function autopilot() {
   for (const n of npcs) {
     if (n.task || n.idleT < 5) continue;
     n.idleT = 0;
-    if (n.role === 'guard') { setTask(n, { type: 'guard' }); continue; }
+    if (n.queue.length) continue;
+    const bs = structures.find(x => x.status === 'building');
+    if (n.role === 'guard') { const w = bs && npcs.find(o => o.task && o.task.st === bs); setTask(n, w ? { type: 'protect', who: w.id } : { type: 'guard' }); continue; }
+    if (bs && npcs.some(o => o !== n && o.task && o.task.st === bs)) { setTask(n, { type: 'assist' }); continue; }
     const mine = structures.filter(s => s.by === n.name).length;
     if (mine < 2 && Math.random() < 0.7) setTask(n, { type: 'build', name: n.name + "'s hut", where: 'near_player', plan: HUT }); else setTask(n, { type: 'gather', resource: ['wood', 'stone'][Math.floor(Math.random() * 2)], amount: 15 });
   }
