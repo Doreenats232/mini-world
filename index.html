@@ -47,6 +47,10 @@ canvas{display:block}
 #hint{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#000a;color:#ffd400;padding:6px 12px;border-radius:8px;font-size:14px;display:none;pointer-events:none}
 #stars{position:fixed;top:4px;left:50%;transform:translateX(-50%);color:#ff3b30;font-size:26px;text-shadow:0 2px 4px #000;display:none;letter-spacing:4px;animation:bl 1s infinite;pointer-events:none}
 @keyframes bl{50%{opacity:.5}}
+#mp{position:fixed;inset:0;margin:auto;width:min(420px,92vw);height:fit-content;background:#111e;color:#fff;padding:14px;border-radius:12px;display:none;z-index:30;font-size:13px}
+#mp input{width:100%;padding:9px;margin:4px 0 10px;border-radius:6px;border:1px solid #888;font-size:14px;-webkit-user-select:text;user-select:text}
+#mp button{padding:10px 14px;border-radius:8px;border:0;background:#2e86de;color:#fff;font-size:15px}
+#mpbtn{position:fixed;top:1px;right:122px;font-size:18px;background:none;border:0;color:#fff;z-index:9}
 #gear{position:fixed;top:1px;right:62px;font-size:18px;background:none;border:0;color:#fff;z-index:9}
 #chatbtn{left:30px;bottom:150px}
 </style></head><body>
@@ -56,8 +60,9 @@ canvas{display:block}
 <canvas id="mini"></canvas><div id="hint"></div><div id="stars"></div>
 <div id="shop"><b>$ SHOP</b> <span id="shopmoney" style="float:right"></span><div id="shopitems"></div><button id="shopclose">Close</button></div>
 <div id="labels"></div><div id="aistat"></div><div id="log"></div>
-<button id="gear">⚙</button><button id="mute">🔊</button>
+<button id="gear">⚙</button><button id="mpbtn">🌐</button><button id="mute">🔊</button>
 <div id="chatbar"><input id="chatin" placeholder="Talk to your NPCs (e.g. Archie, build a house near me)" maxlength="300"><button id="chatsend">Send</button></div>
+<div id="mp"><b>🌐 Multiplayer</b><div id="mpstat" style="margin:10px 0"></div>Your name<input id="mpname" maxlength="16"><button id="mphost">Host a room</button><br><br>Join a friend: room code<input id="mpcode" maxlength="8" placeholder="e.g. K7Q2M" style="text-transform:uppercase"><button id="mpjoin">Join</button> <button id="mpleave" style="background:#a33">Leave</button> <button id="mpclose" style="background:#555">Close</button><div style="margin-top:10px;font-size:11px;opacity:.75">Host keeps the game open. Friends see you, share the blocks you build, and talk to your NPCs. Chat with players by typing !hello</div></div>
 <div id="panel"><b>NPC brain (RelayAPI)</b><br><br>Relay URL<input id="relurl"><br>API key (saved on this device only)<input id="relkey" type="password" placeholder="paste your relay key"><button id="relsave">Save</button> <button id="relclose" style="background:#555">Close</button></div>
 <div id="joy"></div>
 <div class="b" id="chatbtn">CHAT</div>

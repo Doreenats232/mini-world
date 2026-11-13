@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import Peer from 'peerjs';
 
 const VER = __V__;
 const REPO = 'Doreenats232/mini-world';
@@ -9,6 +10,8 @@ const $ = id => document.getElementById(id);
 $('ver').textContent = 'v' + VER;
 if (isTouch) $('help').style.display = 'none';
 const V3 = THREE.Vector3;
+const net = { on: false, host: false, client: false, peer: null, conns: [], hostConn: null, myId: null, code: '', remotes: new Map(), applying: false, noSave: false, names: [], name: 'Player' + Math.floor(Math.random() * 900 + 100) };
+try { const n = localStorage.getItem('mw_name'); if (n) net.name = n; } catch (e) {}
 
 // ---------- procedural textures ----------
 function mkTex(w, h, draw) {
@@ -189,12 +192,13 @@ function addBlock(cx, cy, cz, t, doSave = true, anim = false) {
   solids.set(k, new THREE.Box3().setFromObject(m));
   scene.add(m); targets.push(m); blockMeshes.set(k, m);
   if (anim) { m.scale.setScalar(0.2); grow.push({ m, t: 0 }); }
+  if (net.on && !net.applying) netSend({ t: 'b+', a: [cx, cy, cz, t] });
   if (doSave) queueSave();
   return true;
 }
-function delBlock(k) { const m = blockMeshes.get(k); if (!m) return; scene.remove(m); targets.splice(targets.indexOf(m), 1); blockMeshes.delete(k); solids.delete(k); queueSave(); }
+function delBlock(k) { const m = blockMeshes.get(k); if (!m) return; scene.remove(m); targets.splice(targets.indexOf(m), 1); blockMeshes.delete(k); solids.delete(k); if (net.on && !net.applying) netSend({ t: 'b-', k }); queueSave(); }
 function queueSave() { clearTimeout(saveT); saveT = setTimeout(save, 400); }
-function save() { try { localStorage.setItem('mw_save', JSON.stringify({ b: [...blockMeshes.values()].map(m => [m.userData.cx, m.userData.cy, m.userData.cz, m.userData.c]), p: [P.pos.x, P.pos.y, P.pos.z, P.yaw], k: kills, m: money, u: up, sg: hasShotgun, f: [...furn.values()].map(o => [o.cx, o.cy, o.cz, o.f, o.rot]) })); } catch (e) {} }
+function save() { if (net.noSave) return; try { localStorage.setItem('mw_save', JSON.stringify({ b: [...blockMeshes.values()].map(m => [m.userData.cx, m.userData.cy, m.userData.cz, m.userData.c]), p: [P.pos.x, P.pos.y, P.pos.z, P.yaw], k: kills, m: money, u: up, sg: hasShotgun, f: [...furn.values()].map(o => [o.cx, o.cy, o.cz, o.f, o.rot]) })); } catch (e) {} }
 setInterval(() => save(), 10000); addEventListener('beforeunload', save);
 
 // ---------- player ----------
@@ -302,7 +306,7 @@ function damageEnemy(e, n, quiet) {
 function enemyStep(e, dt) {
   let T = inCar ? inCar.pos : P.pos, npc = null;
   const dp = dist2(T, e.pos);
-  if (dp > 14) { let bd = 10; for (const n of npcs) { const d = dist2(n.pos, e.pos); if (d < bd) { bd = d; npc = n; } } if (npc) T = npc.pos; }
+  if (dp > 14 && !net.client) { let bd = 10; for (const n of npcs) { const d = dist2(n.pos, e.pos); if (d < bd) { bd = d; npc = n; } } if (npc) T = npc.pos; }
   const tx = T.x - e.pos.x, tz = T.z - e.pos.z, d = Math.hypot(tx, tz);
   if (!npc && d > 100) return;
   let mx = 0, mz = 0;
@@ -375,10 +379,10 @@ function mkNpc(d) {
 NPCDEF.forEach(mkNpc);
 const nearestNpc = pos => { let b = null, bd = 1e9; for (const n of npcs) { const d = dist2(n.pos, pos); if (d < bd) { bd = d; b = n; } } return b; };
 const COSTRES = i => BLOCKS[i][1];
-function logLine(txt, cls) { const d = document.createElement('div'); d.textContent = txt; if (cls) d.className = cls; const L = $('log'); L.appendChild(d); while (L.children.length > 8) L.firstChild.remove(); setTimeout(() => d.remove(), 40000); }
+function logLine(txt, cls) { if (net.on && net.host && cls !== 'me') nsend({ t: 'log', txt, cls }); const d = document.createElement('div'); d.textContent = txt; if (cls) d.className = cls; const L = $('log'); L.appendChild(d); while (L.children.length > 8) L.firstChild.remove(); setTimeout(() => d.remove(), 40000); }
 let events = [];
 const ev = t => { events.push(t); logLine('· ' + t, 'ev'); };
-function say(n, t) { t = String(t || '').slice(0, 220); if (!t) return; n.bub.textContent = t; n.bubT = 6 + t.length / 18; logLine(n.name + ': ' + t); }
+function say(n, t) { t = String(t || '').slice(0, 220); if (!t) return; if (net.on && net.host) nsend({ t: 'say', id: n.id, text: t }); n.bub.textContent = t; n.bubT = 6 + t.length / 18; logLine(n.name + ': ' + t); }
 function npcHurt(n, d) { n.hp -= d; if (n.hp <= 0) { dropTask(n); n.hp = 80; n.pos.set(n.home.x, 0, n.home.z); n.task = null; n.sub = null; n.last = 'was knocked out and woke up at home'; ev(n.name + ' was knocked out by thugs and woke up at home'); } }
 
 // ---- plan expansion (architecture DSL) ----
@@ -679,14 +683,14 @@ async function callAI(m) {
   aiBusy = false;
 }
 setInterval(() => {
-  if (!REL.key || aiBusy) return;
+  if (!REL.key || aiBusy || net.client) return;
   const since = performance.now() - lastAI;
   if (pendingMsg && since > 2500) { const m = pendingMsg; pendingMsg = null; callAI(m); return; }
   if (aiFail >= 3 && since < 60000) return;
   if ((npcs.some(n => !n.task) && since > 25000) || since > 90000 || (events.length > 2 && since > 20000)) callAI(null);
 }, 1000);
 function autopilot() {
-  if (REL.key && aiFail < 3) return;
+  if (net.client || (REL.key && aiFail < 3)) return;
   for (const n of npcs) {
     if (n.task || n.idleT < 5) continue;
     n.idleT = 0;
@@ -714,10 +718,12 @@ function fallbackChat(m) {
   else reply = REL.key ? 'My head is fuzzy, try again in a moment.' : 'Add your relay key in settings (⚙) so I can think properly. Until then I can follow, guard, gather or build a hut.';
   say(n, reply);
 }
-function playerSay(text) {
+function playerSay(text, who = 'You') {
   text = text.trim(); if (!text) return;
+  if (text[0] === '!') { const t = text.slice(1).trim(); if (!net.on) logLine('Host or join a room (🌐) to chat with players', 'ev'); else if (t) { logLine(net.name + ': ' + t, 'me'); netSend({ t: 'chat', name: net.name, text: t }); } return; }
+  if (net.client) { logLine('You: ' + text, 'me'); netSend({ t: 'npcchat', text }); return; }
   const mt = text.match(/^@?(archie|mason|ranger)\b[\s,:]*/i), to = mt ? mt[1].toLowerCase() : 'everyone';
-  logLine('You: ' + text, 'me');
+  logLine(who + ': ' + text, 'me');
   const m = { to, text: mt ? text.slice(mt[0].length) || text : text };
   if (!REL.key || aiFail >= 3) fallbackChat(m); else pendingMsg = m;
 }
@@ -806,7 +812,7 @@ if (!isTouch) {
 const tch = {};
 function btn(id, fn) { $(id).addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); fn(); }, { passive: false }); }
 btn('jump', () => { if (!inCar) jump(); }); btn('place', act1); btn('brk', act2); btn('col', colAct); btn('mode', toggleMode); btn('car', toggleCar); btn('chatbtn', openChat);
-const uiTarget = t => t.closest && t.closest('#chatbar,#panel,#shop,#gear,#mute,.b');
+const uiTarget = t => t.closest && t.closest('#chatbar,#panel,#shop,#mp,#mpbtn,#gear,#mute,.b');
 addEventListener('touchstart', e => { for (const t of e.changedTouches) { if (uiTarget(t.target)) continue; tch[t.identifier] = { x: t.clientX, y: t.clientY, mode: t.clientX < innerWidth / 2 ? 'joy' : 'look' }; } }, { passive: false });
 addEventListener('touchmove', e => {
   if (!uiTarget(e.target)) e.preventDefault();
@@ -830,7 +836,7 @@ if (native) {
   setInterval(async () => {
     try {
       const j = await (await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })).json();
-      if (j.version && j.version !== VER) { save(); const u = $('upd'); u.style.display = 'block'; u.textContent = 'New version v' + j.version + ', reloading...'; setTimeout(() => location.replace(location.pathname + '?v=' + j.version), 3000); }
+      if (j.version && j.version !== VER) { if (net.on) { const u2 = $('upd'); u2.style.display = 'block'; u2.textContent = 'New version available. Leave the room to update.'; return; } save(); const u = $('upd'); u.style.display = 'block'; u.textContent = 'New version v' + j.version + ', reloading...'; setTimeout(() => location.replace(location.pathname + '?v=' + j.version), 3000); }
     } catch (e) {}
   }, 30000);
 }
@@ -880,13 +886,14 @@ function addFurniture(cx, cy, cz, type, rot = 0, anim = false, doSave = true) {
   furn.set(k, o);
   if (type === 'door') { const al = rot % 2 === 0, hw = al ? 0.9 : 0.1, hd = al ? 0.1 : 0.9; o.box = new THREE.Box3(new V3(x - hw, y, z - hd), new V3(x + hw, y + 1.95, z + hd)); o.open = 0; o.solid = true; solids.set('d' + k, o.box); doors.push(o); }
   if (anim) { g.scale.setScalar(0.3); grow.push({ m: g, t: 0 }); }
+  if (net.on && !net.applying) netSend({ t: 'f+', a: [cx, cy, cz, type, rot] });
   if (doSave) queueSave();
   return true;
 }
 function delFurniture(k) {
   const o = furn.get(k); if (!o) return;
   scene.remove(o.grp); o.meshes.forEach(m => { const i = targets.indexOf(m); if (i >= 0) targets.splice(i, 1); });
-  furn.delete(k); if (o.f === 'door') { doors.splice(doors.indexOf(o), 1); solids.delete('d' + k); } queueSave();
+  furn.delete(k); if (o.f === 'door') { doors.splice(doors.indexOf(o), 1); solids.delete('d' + k); } if (net.on && !net.applying) netSend({ t: 'f-', k }); queueSave();
 }
 function updateDoors(dt) {
   for (const d of doors) {
@@ -999,6 +1006,125 @@ function openShop() { shopOpen = true; for (const k in keys) keys[k] = false; do
 function closeShop() { shopOpen = false; $('shop').style.display = 'none'; }
 $('shopclose').addEventListener('click', closeShop);
 
+// ---------- online multiplayer (peer-to-peer, host-authoritative world) ----------
+let netT = 0;
+const nsend = (m, except) => { for (const c of net.conns) if (c.open && c !== except) c.send(m); };
+const toHost = m => { if (net.hostConn && net.hostConn.open) net.hostConn.send(m); };
+function netSend(m) { if (net.host) nsend(m); else toHost(m); }
+const r2 = v => Math.round(v * 100) / 100;
+function mpUpdate() {
+  const st = $('mpstat');
+  if (!net.on) { st.textContent = net.status || 'Not in a room'; return; }
+  const names = net.host ? [net.name + ' (host)', ...net.conns.map(c => c.nm)] : net.names;
+  st.innerHTML = '<div style="font-size:12px;opacity:.8">' + (net.host ? 'Hosting room code' : 'Connected to room') + '</div><div style="font-size:30px;font-weight:700;letter-spacing:4px;color:#ffd400"></div><div style="font-size:12px"></div>';
+  st.children[1].textContent = net.code; st.children[2].textContent = 'Players: ' + names.join(', ');
+}
+function netApply(m) {
+  net.applying = true;
+  try {
+    if (m.t === 'b+' && Array.isArray(m.a)) { const a = m.a; if (a.slice(0, 4).every(Number.isFinite) && a[3] >= 0 && a[3] < BLOCKS.length) addBlock(a[0], a[1], a[2], a[3], true, false); }
+    else if (m.t === 'b-') delBlock(String(m.k));
+    else if (m.t === 'f+' && Array.isArray(m.a)) { const a = m.a; if ([a[0], a[1], a[2]].every(Number.isFinite)) addFurniture(a[0], a[1], a[2], String(a[3]), (a[4] | 0) & 3, false, true); }
+    else if (m.t === 'f-') delFurniture(String(m.k));
+  } finally { net.applying = false; }
+}
+function hashColor(name) { let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 360; return new THREE.Color().setHSL(h / 360, 0.65, 0.5); }
+function mkAvatar(id, name) {
+  const g = new THREE.Group(), cm = new THREE.MeshLambertMaterial({ color: hashColor(name) }), skin = new THREE.MeshLambertMaterial({ color: 0xe0b48f });
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.4), new THREE.MeshLambertMaterial({ color: 0x333344 })); legs.position.y = 0.35;
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.5), cm); torso.position.y = 1.1;
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), skin); head.position.y = 1.75;
+  const mkArm = sx => { const p = new THREE.Group(); p.position.set(sx * 0.55, 1.45, 0); const a = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.7, 0.22), cm); a.position.y = -0.3; p.add(a); return p; };
+  const aL = mkArm(-1), aR = mkArm(1); g.add(legs, torso, head, aL, aR); scene.add(g);
+  const el = document.createElement('div'); el.className = 'nl'; const bub = document.createElement('div'); bub.className = 'bub'; const nm = document.createElement('div'); nm.innerHTML = '<b style="color:#7fe7ff"></b>'; nm.firstChild.textContent = name; el.append(bub, nm); $('labels').appendChild(el);
+  net.remotes.set(id, { id, name, g, aL, aR, el, bub, pos: new V3(0, -50, 0), tp: new V3(0, -50, 0), yaw: 0, first: true, bubT: 0 });
+}
+function removeAvatar(id) { const r = net.remotes.get(id); if (!r) return; scene.remove(r.g); r.el.remove(); net.remotes.delete(id); }
+function updateRemotes(dt) {
+  for (const r of net.remotes.values()) {
+    const b = r.pos.clone(); r.pos.lerp(r.tp, Math.min(1, dt * 12)); const sp = r.pos.distanceTo(b) / Math.max(dt, 0.001);
+    r.g.position.copy(r.pos); let dr = r.yaw + Math.PI - r.g.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); r.g.rotation.y += dr * Math.min(1, dt * 10);
+    const w = sp > 0.6 ? Math.sin(clock * 9) * 0.8 : 0; r.aL.rotation.x = w; r.aR.rotation.x = -w;
+    r.bubT -= dt; r.bub.style.display = r.bubT > 0 ? 'block' : 'none';
+    const v = new V3(r.pos.x, r.pos.y + 2.5, r.pos.z).project(cam);
+    if (v.z > 1 || v.z < -1 || dist2(r.pos, cam.position) > 120) r.el.style.display = 'none'; else { r.el.style.display = 'block'; r.el.style.transform = `translate(${(v.x * 0.5 + 0.5) * innerWidth}px,${(-v.y * 0.5 + 0.5) * innerHeight}px) translate(-50%,-100%)`; }
+  }
+}
+function remoteChat(name, text) { text = String(text || '').slice(0, 200); logLine(name + ': ' + text, 'me'); for (const r of net.remotes.values()) if (r.name === name) { r.bub.textContent = text; r.bubT = 6; } }
+function netTick() {
+  const yaw = inCar ? inCar.h + Math.PI : P.yaw;
+  if (net.host) {
+    const pl = [{ id: 'host', name: net.name, x: r2(P.pos.x), y: r2(P.pos.y), z: r2(P.pos.z), yaw: r2(yaw) }];
+    for (const c of net.conns) if (c.st) pl.push({ id: c.peer, name: c.nm, ...c.st });
+    net.names = pl.map(p => p.name);
+    nsend({ t: 'ps', pl, day: dayT, npcs: npcs.map(n => ({ id: n.id, x: r2(n.pos.x), y: r2(n.pos.y), z: r2(n.pos.z), f: r2(n.face), w: n.walking ? 1 : 0, k: n.working ? 1 : 0, s: n.swing > 0 ? 1 : 0, st: n.status, hp: Math.round(n.hp) })) });
+  } else toHost({ t: 'p', x: r2(P.pos.x), y: r2(P.pos.y), z: r2(P.pos.z), yaw: r2(yaw) });
+}
+function hostData(c, m) {
+  if (!m || typeof m !== 'object') return;
+  if (m.t === 'hello') {
+    c.nm = String(m.name || 'Player').slice(0, 16); if (!net.conns.includes(c)) net.conns.push(c);
+    c.send({ t: 'welcome', code: net.code, host: net.name, ver: VER, snap: { b: [...blockMeshes.values()].map(b => [b.userData.cx, b.userData.cy, b.userData.cz, b.userData.c]), f: [...furn.values()].map(o => [o.cx, o.cy, o.cz, o.f, o.rot]), pos: [P.pos.x, P.pos.z], day: dayT } });
+    logLine('🌐 ' + c.nm + ' joined the room', 'ev'); nsend({ t: 'chat', name: '🌐', text: c.nm + ' joined' }, c); mpUpdate();
+    if (m.ver && m.ver !== VER) logLine('⚠ ' + c.nm + ' runs a different version (v' + m.ver + ')', 'ev');
+  } else if (m.t === 'p') c.st = { x: +m.x || 0, y: +m.y || 0, z: +m.z || 0, yaw: +m.yaw || 0 };
+  else if (m.t === 'b+' || m.t === 'b-' || m.t === 'f+' || m.t === 'f-') { netApply(m); nsend(m, c); }
+  else if (m.t === 'chat') { remoteChat(c.nm, m.text); nsend({ t: 'chat', name: c.nm, text: String(m.text || '').slice(0, 200) }, c); }
+  else if (m.t === 'npcchat') playerSay(String(m.text || '').slice(0, 300), c.nm);
+}
+function clientData(m) {
+  if (!m || typeof m !== 'object') return;
+  if (m.t === 'welcome') {
+    net.noSave = true; net.applying = true;
+    try { for (const k of [...blockMeshes.keys()]) delBlock(k); for (const k of [...furn.keys()]) delFurniture(k); m.snap.b.forEach(a => addBlock(a[0], a[1], a[2], a[3], false, false)); m.snap.f.forEach(a => addFurniture(a[0], a[1], a[2], a[3], a[4], false, false)); } finally { net.applying = false; }
+    P.pos.set(m.snap.pos[0] + 2, 1, m.snap.pos[1] + 2); P.vel.set(0, 0, 0); dayT = m.snap.day;
+    net.on = true; net.client = true; net.code = m.code; net.names = [m.host + ' (host)', net.name]; mpUpdate(); $('mp').style.display = 'none';
+    msg('Joined ' + m.host + "'s room", 2500); logLine('🌐 Joined ' + m.host + "'s world. Type !text to chat with players, plain text talks to the NPCs.", 'ev');
+    if (m.ver && m.ver !== VER) logLine('⚠ Host runs v' + m.ver + ', you run v' + VER + '. Reload to match.', 'ev');
+  } else if (m.t === 'ps') {
+    const seen = new Set();
+    for (const p of m.pl) {
+      if (p.id === net.myId) continue; seen.add(p.id);
+      if (!net.remotes.has(p.id)) mkAvatar(p.id, String(p.name || 'Player'));
+      const r = net.remotes.get(p.id); r.tp.set(p.x, p.y, p.z); r.yaw = p.yaw; if (r.first) { r.pos.copy(r.tp); r.first = false; }
+    }
+    for (const id of [...net.remotes.keys()]) if (!seen.has(id)) removeAvatar(id);
+    net.names = m.pl.map(p => p.name); dayT = m.day;
+    for (const d of m.npcs || []) { const n = npcs.find(x => x.id === d.id); if (!n) continue; if (!n.tp) { n.tp = new V3(); n.pos.set(d.x, d.y, d.z); } n.tp.set(d.x, d.y, d.z); n.face = d.f; n.walking = !!d.w; n.working = !!d.k; if (d.s) n.swing = 0.25; n.status = d.st; n.hp = d.hp; }
+  } else if (m.t === 'b+' || m.t === 'b-' || m.t === 'f+' || m.t === 'f-') netApply(m);
+  else if (m.t === 'chat') remoteChat(m.name, m.text);
+  else if (m.t === 'log') logLine(String(m.txt), m.cls);
+  else if (m.t === 'say') { const n = npcs.find(x => x.id === m.id); if (n) { n.bub.textContent = String(m.text); n.bubT = 7; } }
+}
+function mpErr(t) { net.status = t; mpUpdate(); }
+function hostRoom(tries = 0) {
+  if (net.on || net.peer) return;
+  const code = Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+  mpErr('Creating room…');
+  const peer = new Peer('mwld-' + code); net.peer = peer;
+  peer.on('open', () => { net.on = true; net.host = true; net.code = code; mpUpdate(); logLine('🌐 Room open. Share the code ' + code, 'ev'); });
+  peer.on('connection', c => { c.on('data', m => hostData(c, m)); c.on('close', () => { const i = net.conns.indexOf(c); if (i >= 0) net.conns.splice(i, 1); nsend({ t: 'chat', name: '🌐', text: (c.nm || 'A player') + ' left' }); logLine('🌐 ' + (c.nm || 'A player') + ' left', 'ev'); mpUpdate(); }); });
+  peer.on('error', e => { if (e.type === 'unavailable-id' && tries < 4) { net.peer = null; peer.destroy(); hostRoom(tries + 1); } else mpErr('Could not create room (' + e.type + '). Check your connection.'); });
+}
+function joinRoom(code) {
+  if (net.on || net.peer || !code) return;
+  code = code.toUpperCase().replace(/[^A-Z0-9]/g, ''); mpErr('Connecting to ' + code + '…');
+  const peer = new Peer(); net.peer = peer;
+  peer.on('open', id => {
+    net.myId = id; const c = peer.connect('mwld-' + code, { reliable: true }); net.hostConn = c;
+    c.on('open', () => c.send({ t: 'hello', name: net.name, ver: VER })); c.on('data', clientData);
+    c.on('close', () => { net.on = false; net.client = false; msg('Disconnected from room', 3000); logLine('🌐 Lost connection to the host. Tap Leave (🌐) to return to your own world.', 'ev'); mpErr('Disconnected'); });
+  });
+  peer.on('error', e => { net.peer = null; mpErr(e.type === 'peer-unavailable' ? 'Room not found. Check the code (the host must keep the game open).' : 'Connection problem (' + e.type + ')'); });
+  setTimeout(() => { if (!net.on && net.peer === peer) { mpErr('Still connecting… the host may be offline or behind a strict network.'); } }, 15000);
+}
+const setName = () => { net.name = ($('mpname').value.trim() || net.name).slice(0, 16); try { localStorage.setItem('mw_name', net.name); } catch (e) {} };
+$('mpbtn').addEventListener('click', () => { $('mpname').value = net.name; mpUpdate(); $('mp').style.display = 'block'; document.exitPointerLock && document.exitPointerLock(); });
+$('mpclose').addEventListener('click', () => { $('mp').style.display = 'none'; });
+$('mphost').addEventListener('click', () => { setName(); hostRoom(); });
+$('mpjoin').addEventListener('click', () => { setName(); joinRoom($('mpcode').value); });
+$('mpleave').addEventListener('click', () => location.reload());
+
 // ---------- minimap ----------
 const mini = $('mini'), mg = mini.getContext('2d'), MS = isTouch ? 110 : 150, MR = 70;
 mini.width = mini.height = MS * 2; mini.style.width = mini.style.height = MS + 'px';
@@ -1019,6 +1145,7 @@ function drawMini() {
   for (const nd of nodes) if (nd.left > 0) dot(nd.pos.x, nd.pos.z, nd.type === 'wood' ? '#2ecc40' : nd.type === 'stone' ? '#e0e0e0' : '#f1c40f', 4, false);
   for (const e of enemies) if (!e.dead) dot(e.pos.x, e.pos.z, '#ff3b30', 5, false);
   for (const e of cops) if (!e.dead) dot(e.pos.x, e.pos.z, '#3b82f6', 6, false);
+  for (const r of net.remotes.values()) dot(r.pos.x, r.pos.z, '#00e5ff', 6, true);
   dot(SHOP.x, SHOP.z, '#ffd400', 7, true);
   for (const cr of cars) { const [sx, sy, inside] = toS(cr.pos.x, cr.pos.z); if (inside) { mg.fillStyle = '#fff'; mg.fillRect(sx - 4, sy - 4, 8, 8); } }
   for (const n of npcs) { const [sx, sy] = toS(n.pos.x, n.pos.z, true); mg.fillStyle = '#' + n.col.toString(16).padStart(6, '0'); mg.beginPath(); mg.arc(sx, sy, 8, 0, 6.2832); mg.fill(); mg.strokeStyle = '#fff'; mg.lineWidth = 2; mg.stroke(); mg.fillStyle = '#fff'; mg.font = 'bold 12px sans-serif'; mg.textAlign = 'center'; mg.fillText(n.name[0], sx, sy + 4); }
@@ -1048,10 +1175,12 @@ ren.setAnimationLoop(now => {
     calmT = cops.some(c => dist2(c.pos, P.pos) < 60) ? 0 : calmT + dt;
     if (calmT > 10 || clock - lastCrime > 60) { wanted--; calmT = 0; lastCrime = clock; hudStars(); }
   } else if (cops.length) { copLeaveT -= dt; if (copLeaveT <= 0) clearCops(); }
-  for (const n of npcs) npcStep(n, dt);
+  if (net.client) { for (const n of npcs) if (n.tp) n.pos.lerp(n.tp, Math.min(1, dt * 10)); } else for (const n of npcs) npcStep(n, dt);
   updateDoors(dt);
   cam.updateMatrixWorld();
   for (const n of npcs) npcVisuals(n, dt);
+  updateRemotes(dt);
+  netT -= dt; if (net.on && netT <= 0) { netT = 0.1; netTick(); }
   for (let i = grow.length - 1; i >= 0; i--) { const g = grow[i]; g.t += dt * 4; const s = Math.min(1, 0.2 + g.t); g.m.scale.setScalar(s); if (s >= 1) grow.splice(i, 1); }
   for (const nd of nodes) { if (nd.left < nd.max) { nd.regen += dt; if (nd.regen > 6) { nd.regen = 0; nd.left++; nd.mesh.visible = true; nd.mesh.scale.setScalar(0.45 + 0.55 * nd.left / nd.max); } } }
   flashV = Math.max(0, flashV - dt * 1.5); $('flash').style.opacity = flashV;

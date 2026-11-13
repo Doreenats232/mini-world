@@ -13,6 +13,7 @@
     "@capacitor/browser": "^6.0.0",
     "@capacitor/core": "^6.0.0",
     "electron-updater": "^6.1.7",
+    "peerjs": "^1.5.5",
     "three": "^0.160.0"
   },
   "devDependencies": {
@@ -25,10 +26,27 @@
   "build": {
     "appId": "com.mld.miniworld",
     "productName": "MiniWorld",
-    "directories": { "output": "release" },
-    "files": ["dist/**", "electron/**", "package.json"],
-    "win": { "target": "nsis" },
-    "nsis": { "oneClick": true, "artifactName": "MiniWorld-Setup.exe" },
-    "publish": [{ "provider": "github", "owner": "Doreenats232", "repo": "mini-world" }]
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "artifactName": "MiniWorld-Setup.exe"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Doreenats232",
+        "repo": "mini-world"
+      }
+    ]
   }
 }
