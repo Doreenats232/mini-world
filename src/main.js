@@ -455,6 +455,7 @@ function setTask(n, t) {
   if (type === 'wander') { n.task = { type: 'wander', wt: 0, tx: n.pos.x, tz: n.pos.z }; return; }
   if (type === 'follow' || type === 'guard') { n.task = { type }; return; }
   if (type === 'protect') { n.task = { type: 'protect', who: String(t.who || '').toLowerCase() }; return; }
+  if (type === 'town') { startTown(String(t.name || 'Oakvale').slice(0, 24), Array.isArray(t.buildings) ? t.buildings.map(x => String(x).toLowerCase()) : null, String(t.size || 'small')); return; }
   if (type === 'assist') {
     const who = npcs.find(o => o !== n && o.id === String(t.with || '').toLowerCase() && o.task && o.task.st && o.task.st.status === 'building');
     const st = who ? who.task.st : structures.find(x => x.status === 'building');
@@ -471,16 +472,16 @@ function setTask(n, t) {
     let mnx = 1e9, mny = 1e9, mnz = 1e9; for (const c of cells0) { mnx = Math.min(mnx, c.x); mny = Math.min(mny, c.y); mnz = Math.min(mnz, c.z); }
     const norm = cells0.map(c => ({ ...c, x: c.x - mnx, y: c.y - mny, z: c.z - mnz }));
     let W = 0, D = 0; for (const c of norm) { W = Math.max(W, c.x + 1); D = Math.max(D, c.z + 1); }
-    const S = Math.max(W, D), toMe = String(t.where || '').includes('me');
-    const ref = toMe ? n.pos : P.pos, rx = ref.x + (+t.dx || 0), rz = ref.z + (+t.dz || 0);
-    const site = findSite(S, rx, rz);
-    if (!site) { ev(n.name + ' could not find free space for ' + (t.name || 'the building')); n.task = null; return; }
+    const S = Math.max(W, D), toMe = String(t.where || '').includes('me'), abs = t.ax != null && t.az != null && Number.isFinite(+t.ax) && Number.isFinite(+t.az);
+    const ref = abs ? { x: +t.ax, z: +t.az } : toMe ? n.pos : P.pos, rx = ref.x + (abs ? 0 : (+t.dx || 0)), rz = ref.z + (abs ? 0 : (+t.dz || 0));
+    const ex = t.exact, site = ex && siteFree(ex.x0, ex.z0, S) ? ex : findSite(S, rx, rz);
+    if (!site) { ev(n.name + ' could not find free space for ' + (t.name || 'the building')); n.task = null; if (towns.includes(t._town)) townDone(t._town); return; }
     const cxm = (site.x0 + S / 2) * 2, czm = (site.z0 + S / 2) * 2;
-    let r = 0; if (t.face_player !== false) { const vx = P.pos.x - cxm, vz = P.pos.z - czm; let bd = -9; FACE.forEach((f, i) => { const dd = f[0] * vx + f[1] * vz; if (dd > bd) { bd = dd; r = i; } }); }
+    let r = 0; if (t.face_player !== false) { const fp = t.fx != null && Number.isFinite(+t.fx) && Number.isFinite(+t.fz) ? { x: +t.fx, z: +t.fz } : P.pos, vx = fp.x - cxm, vz = fp.z - czm; let bd = -9; FACE.forEach((f, i) => { const dd = f[0] * vx + f[1] * vz; if (dd > bd) { bd = dd; r = i; } }); }
     const rot = rotCells(norm, r), ox = site.x0 + Math.floor((S - rot.W) / 2), oz = site.z0 + Math.floor((S - rot.D) / 2);
     const cells = rot.cells.map(c => ({ cx: ox + c.x, cy: c.y, cz: oz + c.z, t: c.t, f: c.f, rot: c.rot })).sort((a, b) => (a.f ? 1 : 0) - (b.f ? 1 : 0) || a.cy - b.cy || a.cz - b.cz || a.cx - b.cx);
     reserved.push(new THREE.Box3(new V3(site.x0 * 2 - 2, 0, site.z0 * 2 - 2), new V3((site.x0 + S) * 2 + 2, 60, (site.z0 + S) * 2 + 2)));
-    const st = { name: String(t.name || 'Building').slice(0, 30), by: n.name, status: 'building', done: 0, total: cells.length, cells, next: 0, retry: [] };
+    const st = { name: String(t.name || 'Building').slice(0, 30), by: n.name, status: 'building', done: 0, total: cells.length, cells, next: 0, retry: [], town: towns.includes(t._town) ? t._town : null };
     structures.push(st);
     n.task = { type: 'build', st, cur: null, stuckSkip: 0 };
     const need = remainingNeed(n.task);
@@ -488,6 +489,59 @@ function setTask(n, t) {
     return;
   }
   ev(n.name + ': unknown task type ' + type);
+}
+
+// ---- town founding ----
+const towns = [], KINDS = ['house', 'cottage', 'shop', 'inn', 'tower'];
+const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+function townDone(tw) { tw.done++; ev(`${tw.name}: ${tw.done}/${tw.total} buildings finished`); if (tw.done >= tw.total) { msg('TOWN COMPLETE: ' + tw.name, 3500); ev(`The town of ${tw.name} is complete!`); } }
+function genPlan(kind) {
+  const wall = ['planks', 'brick', 'stone', 'concrete'][rint(0, 3)], roofB = Math.random() < 0.75 ? 'roof' : 'stone', ops = [];
+  const F = (type, x, z, rot = 0) => ops.push({ op: 'furniture', type, x, y: 0, z, rot });
+  const G = (x, y, z) => ops.push({ op: 'fill', x, y, z, w: 1, h: 1, d: 1, block: 'glass' });
+  if (kind === 'plaza') {
+    ops.push({ op: 'box', x: 1, y: 0, z: 1, w: 3, h: 1, d: 3, block: 'stone', hollow: true }, { op: 'fill', x: 2, y: 0, z: 2, w: 1, h: 1, d: 1, block: 'glass' });
+    F('lamp', 0, 0); F('lamp', 4, 0); F('lamp', 0, 4); F('lamp', 4, 4); F('plant', 2, 0); F('plant', 2, 4); F('plant', 0, 2); F('plant', 4, 2); return ops;
+  }
+  if (kind === 'house' || kind === 'cottage') {
+    const c = kind === 'cottage', w = c ? 5 : rint(5, 7), d = c ? 5 : rint(5, 7), h = c ? 2 : rint(2, 3), dx = Math.floor(w / 2);
+    ops.push({ op: 'box', x: 0, y: 0, z: 0, w, h, d, block: wall, hollow: true }); G(1, 1, 0); G(w - 2, 1, 0); G(0, 1, Math.floor(d / 2)); G(w - 1, 1, Math.floor(d / 2));
+    F('door', dx, 0); ops.push({ op: 'roof', x: 0, y: h, z: 0, w, d, block: roofB, style: 'gable' });
+    F('bed', w - 2, d - 2); F('shelf', w - 2, d - 3); F('lamp', w - 2, 1); F('table', 1, d - 2); F('chair', 1, d - 3, 1); F('rug', dx, Math.floor(d / 2)); F('plant', 1, 1); return ops;
+  }
+  if (kind === 'shop') {
+    const w = rint(7, 9), d = rint(5, 6), h = 3, dx = Math.floor(w / 2);
+    ops.push({ op: 'box', x: 0, y: 0, z: 0, w, h, d, block: wall === 'planks' ? 'brick' : wall, hollow: true }, { op: 'fill', x: 1, y: 1, z: 0, w: 2, h: 1, d: 1, block: 'glass' }, { op: 'fill', x: w - 3, y: 1, z: 0, w: 2, h: 1, d: 1, block: 'glass' });
+    F('door', dx, 0); ops.push({ op: 'roof', x: 0, y: h, z: 0, w, d, block: 'stone', style: 'flat' });
+    F('table', dx, 2); for (let x = 1; x <= w - 2; x += 2) F('shelf', x, d - 2); F('lamp', 1, 1); F('lamp', w - 2, 1); F('plant', w - 2, 2); F('rug', dx, 1); return ops;
+  }
+  if (kind === 'inn') {
+    const w = 9, d = 7, h = 3, dx = 4;
+    ops.push({ op: 'box', x: 0, y: 0, z: 0, w, h, d, block: wall === 'stone' ? 'brick' : wall, hollow: true }, { op: 'fill', x: 1, y: 1, z: 0, w: 2, h: 1, d: 1, block: 'glass' }, { op: 'fill', x: w - 3, y: 1, z: 0, w: 2, h: 1, d: 1, block: 'glass' });
+    F('door', dx, 0); ops.push({ op: 'roof', x: 0, y: h, z: 0, w, d, block: roofB, style: 'gable' });
+    for (const x of [1, 3, 5, 7]) F('bed', x, d - 2); F('table', 2, 2); F('chair', 1, 2, 1); F('chair', 3, 2, 3); F('table', 6, 2); F('chair', 5, 2, 1); F('chair', 7, 2, 3); F('shelf', w - 2, 3); F('lamp', 4, 1); F('plant', 1, 1); return ops;
+  }
+  // tower
+  ops.push({ op: 'box', x: 0, y: 0, z: 0, w: 4, h: 6, d: 4, block: 'stone', hollow: true }); G(2, 2, 0); G(2, 4, 0); G(0, 2, 2); G(0, 4, 2); G(3, 2, 1); G(3, 4, 1);
+  F('door', 1, 0); ops.push({ op: 'roof', x: 0, y: 6, z: 0, w: 4, d: 4, block: 'stone', style: 'flat' });
+  for (const [x, z] of [[0, 0], [3, 0], [0, 3], [3, 3], [0, 2], [3, 1]]) ops.push({ op: 'block', x, y: 7, z, block: 'stone' });
+  F('bed', 2, 2); F('lamp', 1, 2); F('table', 1, 1); F('chair', 2, 1, 1); return ops;
+}
+function startTown(name, kinds, size) {
+  const builders = npcs.filter(x => x.role !== 'guard');
+  if (!builders.length) return;
+  const DEF = { small: ['house', 'house', 'cottage', 'shop'], medium: ['house', 'house', 'house', 'cottage', 'shop', 'inn', 'tower'], large: ['house', 'house', 'house', 'house', 'house', 'cottage', 'cottage', 'shop', 'shop', 'inn', 'tower', 'tower'] };
+  kinds = (kinds || []).filter(k => KINDS.includes(k)).slice(0, 14); if (kinds.length < 2) kinds = DEF[size] || DEF.small;
+  const site = findSite(12, P.pos.x, P.pos.z);
+  if (!site) { ev('No open land big enough for a town near you. Try moving to a clearer area.'); return; }
+  const cx = (site.x0 + 6) * 2, cz = (site.z0 + 6) * 2, town = { name, cx, cz, total: kinds.length + 1, done: 0 }; towns.push(town);
+  const jobs = [{ name: name + ' Plaza', kind: 'plaza', ax: cx, az: cz, exact: { x0: site.x0 + 4, z0: site.z0 + 4 } }];
+  const cnt = {};
+  kinds.forEach((k, i) => { const ang = i / kinds.length * 6.283 + 0.4, r = 26 + (i % 2) * 10; cnt[k] = (cnt[k] || 0) + 1; jobs.push({ name: `${name} ${k[0].toUpperCase() + k.slice(1)} ${cnt[k]}`, kind: k, ax: cx + Math.cos(ang) * r, az: cz + Math.sin(ang) * r }); });
+  jobs.forEach((j, i) => builders[i % builders.length].queue.push({ type: 'build', name: j.name, ax: j.ax, az: j.az, exact: j.exact, fx: cx, fz: cz, plan: genPlan(j.kind), _town: town }));
+  for (const w of builders) if (!w.task && w.queue.length) setTask(w, w.queue.shift());
+  const rg = npcs.find(x => x.role === 'guard'); if (rg) setTask(rg, { type: 'protect', who: builders[0].id });
+  ev(`Founding the town of ${name}: plaza + ${kinds.length} buildings`); msg('FOUNDING: ' + name, 2500); logLine('🏘 ' + name + ' is being planned around a plaza near ' + Math.round(cx) + ', ' + Math.round(cz), 'ev');
 }
 
 // ---- NPC movement / behaviour ----
@@ -523,7 +577,7 @@ function npcStep(n, dt) {
     else { n.face = Math.atan2(foe.pos.x - n.pos.x, foe.pos.z - n.pos.z); if (n.cd <= 0) { n.cd = 0.6; n.swing = 0.25; sfxAt(n.pos, 'punch'); damageEnemy(foe, n.role === 'guard' ? 25 : 12, true); } n.status = 'fighting'; phys(n, 0, 0, dt); return; }
   }
   const t = n.task;
-  if (!t) { phys(n, 0, 0, dt); n.idleT += dt; const dp = dist2(P.pos, n.pos); if (dp < 12) n.face = Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z); return; }
+  if (!t) { if (n.queue.length) { setTask(n, n.queue.shift()); return; } phys(n, 0, 0, dt); n.idleT += dt; const dp = dist2(P.pos, n.pos); if (dp < 12) n.face = Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z); return; }
   if (t.type === 'wander') { t.wt -= dt; if (t.wt <= 0) { const a = Math.random() * 6.28; t.tx = n.pos.x + Math.cos(a) * 14; t.tz = n.pos.z + Math.sin(a) * 14; t.wt = 5; } walkTo(n, t.tx, t.tz, dt, 1, 2.5); n.status = 'wandering'; return; }
   if (t.type === 'follow' || t.type === 'guard') { walkTo(n, P.pos.x, P.pos.z, dt, t.type === 'guard' ? 6 : 3.5, 6); n.status = t.type === 'guard' ? 'guarding you' : 'following you'; return; }
   if (t.type === 'protect') { const o = npcs.find(x => x.id === t.who && x !== n), tp = o ? o.pos : P.pos; walkTo(n, tp.x, tp.z, dt, 6, 6); n.status = 'protecting ' + (o ? o.name : 'you'); return; }
@@ -540,7 +594,7 @@ function npcStep(n, dt) {
       else { while (st.next < st.cells.length && has(st.cells[st.next])) { st.next++; st.done++; } if (st.next < st.cells.length) t.cur = st.cells[st.next++]; }
     }
     if (!t.cur) {
-      if (!npcs.some(o => o !== n && o.task && o.task.st === st && o.task.cur)) st.status = 'complete';
+      if (st.status !== 'complete' && !npcs.some(o => o !== n && o.task && o.task.st === st && o.task.cur)) { st.status = 'complete'; if (st.town) townDone(st.town); }
       finish(n, (t.type === 'assist' ? 'helped finish ' : 'finished building ') + st.name); return;
     }
     const c = t.cur, kc = costOf(c), res = kc.res;
@@ -578,7 +632,7 @@ try { const s = JSON.parse(localStorage.getItem('mw_relay') || 'null'); if (s) R
 const SYS = `You control 3 NPC characters (archie=architect, mason=builder, ranger=guard) in a 3D voxel sandbox city game. Reply with ONE JSON object only. No markdown, no text outside the JSON.
 WORLD: 1 block = 2m. N=-z, S=+z, E=+x, W=-x. Resources: wood (trees), stone (rocks), sand (sand piles). Blocks and cost (1 material per block): planks=wood, roof=wood, stone=stone, brick=stone, concrete=stone, glass=sand. NPCs must gather materials before building; the game automatically walks them to resource nodes, gathers, and goes back to building. Hostile thugs roam the roads; guards fight them. A human PLAYER chats with you. Listen to player_message, act on reasonable requests, and REFUSE (explain briefly, give no task) if it is unsafe, impossible, pointless, or against your personality. You may ask questions, negotiate, joke, report what you see. Keep "say" under 140 characters, in character. "thought" = your short reasoning (1-2 sentences): what you see, what materials you need vs have, why this design.
 REPLY FORMAT: {"npcs":[{"id":"archie","thought":"...","say":"...","task":{...}}]}  Include only NPCs that speak or change task. Omit task to keep the current one.
-TASKS: {"type":"idle"} {"type":"wander"} {"type":"follow"} {"type":"guard"} {"type":"gather","resource":"wood|stone|sand","amount":20} {"type":"build","name":"Cottage","where":"near_player|near_me","dx":0,"dz":0,"plan":[ops]} (dx,dz optional offset in meters from the reference point). {"type":"assist","with":"archie"} joins another NPC's build and splits the blocks with them. {"type":"protect","who":"archie"} guards a teammate and fights thugs near them. Any NPC entry may include "then":[task,...] (max 4) to queue follow-up tasks.
+TASKS: {"type":"idle"} {"type":"wander"} {"type":"follow"} {"type":"guard"} {"type":"gather","resource":"wood|stone|sand","amount":20} {"type":"build","name":"Cottage","where":"near_player|near_me","dx":0,"dz":0,"plan":[ops]} (dx,dz optional offset in meters from the reference point). {"type":"assist","with":"archie"} joins another NPC's build and splits the blocks with them. {"type":"protect","who":"archie"} guards a teammate and fights thugs near them. Any NPC entry may include "then":[task,...] (max 4) to queue follow-up tasks. {"type":"town","name":"Oakvale","buildings":["house","house","cottage","shop","inn","tower"],"size":"small|medium|large"} founds a WHOLE TOWN: the game finds open land, builds a plaza with a well and lamps, designs each listed building (kinds: house, cottage, shop, inn, tower) in a ring facing the plaza, and shares them out among the builders automatically. Use it when the player asks for a town, village or settlement; afterwards do not change the builders' tasks, just comment on progress, keep the guard protecting, and react to the towns progress in the state.
 TEAMWORK: act as a crew, not as individuals. The architect designs and starts a build; builders ASSIST (blocks and material gathering are shared, so it goes faster); the guard PROTECTS the builders. React to teammates' events. If the player asks for something big (a village, a base), split it into several buildings across NPCs and queue follow-ups.
 PLAN OPS (integer cells; x,z horizontal; y up; y=0 is the ground layer; stay within 24x16x24): {"op":"box","x":0,"y":0,"z":0,"w":6,"h":3,"d":6,"block":"brick","hollow":true} (hollow = walls only); {"op":"fill","x","y","z","w","h","d","block"}; {"op":"roof","x","y","z","w","d","block","style":"gable|flat"} (gable ridge runs along x); {"op":"hole","x","y","z","w","h","d"} deletes cells (doors, windows); {"op":"block","x","y","z","block"}; {"op":"floor","x","y","z","w","d","block"}; {"op":"furniture","type":"bed|table|chair|lamp|shelf|rug|plant|door","x","y","z","rot":0} places ONE furniture piece in one cell (cost: bed 3 wood, table 2 wood, chair 1 wood, shelf 2 wood, rug 1 wood, plant 1 wood, lamp 1 sand, door 2 wood). A real door is {"op":"furniture","type":"door","x":2,"y":0,"z":0,"rot":0}: rot 0 for doors in walls running along x (front/back walls), rot 1 for side walls; it opens by itself when someone walks up. rot 0-3 turns other furniture. Later ops override earlier ones. The wall at z=0 is the FRONT; the game rotates the building so the front faces the player.
 ARCHITECTURE RULES: design real buildings with walls, a door (a door furniture piece at ground level in the front wall), windows (glass fill at y=1), a roof covering all walls (roof y = wall height), and a furnished interior (bed, table with chairs, lamp, shelf, rug, plant) inside the walls, never on wall cells, keeping a clear path from the door. Sensible sizes (house about 6x3x6 cells). Nothing floating. Pick materials that match what you have and what resource nodes are near, and say why.
@@ -592,7 +646,7 @@ function stateJSON(m) {
     time: Math.round(clock), player: { at: [Math.round(P.pos.x), Math.round(P.pos.z)], hp: Math.round(P.hp), mode, inCar: !!inCar },
     npcs: npcs.map(n => ({ id: n.id, role: n.role, personality: n.pers, at: [Math.round(n.pos.x), Math.round(n.pos.z)], hp: Math.round(n.hp), inv: n.inv, doing: n.status, task: n.task ? n.task.type : 'idle', last: n.last, playerIs: { m: Math.round(dist2(n.pos, P.pos)), dir: dirName(n.pos, P.pos) }, nearestNodes: nn(n), thugsWithin25m: enemies.filter(e => !e.dead && dist2(e.pos, n.pos) < 25).length })),
     structures: structures.map(s => ({ name: s.name, by: s.by, status: s.status, progress: s.done + '/' + s.total, workers: npcs.filter(o => o.task && o.task.st === s).map(o => o.name) })),
-    events: events.splice(0, 14), player_message: m || null,
+    towns: towns.map(x => ({ name: x.name, built: x.done + '/' + x.total })), events: events.splice(0, 14), player_message: m || null,
   });
 }
 async function relay(user) {
@@ -652,6 +706,7 @@ function fallbackChat(m) {
   if (/follow|come/.test(t)) go({ type: 'follow' }, 'Right behind you.');
   else if (/stop|stay|wait|idle/.test(t)) go({ type: 'idle' }, 'Okay, standing by.');
   else if (/guard|protect|fight/.test(t)) go({ type: 'guard' }, 'On guard!');
+  else if (/town|village/.test(t)) { startTown('Newtown', null, /large|big/.test(t) ? 'large' : /medium/.test(t) ? 'medium' : 'small'); reply = "Founding a town! We'll start with a plaza."; }
   else if (/build|house|hut/.test(t)) go({ type: 'build', name: 'Hut', where: 'near_player', plan: HUT }, "Building a hut. I'll gather the wood first.");
   else if (/wood|tree/.test(t)) go({ type: 'gather', resource: 'wood', amount: 20 }, 'Chopping wood.');
   else if (/stone|rock/.test(t)) go({ type: 'gather', resource: 'stone', amount: 20 }, 'Gathering stone.');
