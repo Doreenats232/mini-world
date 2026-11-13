@@ -87,6 +87,7 @@ addEventListener('resize', () => { cam.aspect = innerWidth / innerHeight; cam.up
 const solids = new Map();
 const targets = [];
 const blockMeshes = new Map();
+const furn = new Map(), doors = [];
 let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), new THREE.MeshLambertMaterial({ map: grassTex }));
 ground.rotation.x = -Math.PI / 2; scene.add(ground); targets.push(ground);
@@ -182,7 +183,7 @@ const grow = [];
 let saveT = 0;
 function addBlock(cx, cy, cz, t, doSave = true, anim = false) {
   const k = cx + ',' + cy + ',' + cz;
-  if (blockMeshes.has(k)) return false;
+  if (blockMeshes.has(k) || furn.has(k)) return false;
   const m = new THREE.Mesh(boxGeo, bmats[t]);
   m.position.set(cx * 2 + 1, cy * 2 + 1, cz * 2 + 1); m.userData = { k, cx, cy, cz, c: t }; m.updateMatrixWorld();
   solids.set(k, new THREE.Box3().setFromObject(m));
@@ -193,7 +194,7 @@ function addBlock(cx, cy, cz, t, doSave = true, anim = false) {
 }
 function delBlock(k) { const m = blockMeshes.get(k); if (!m) return; scene.remove(m); targets.splice(targets.indexOf(m), 1); blockMeshes.delete(k); solids.delete(k); queueSave(); }
 function queueSave() { clearTimeout(saveT); saveT = setTimeout(save, 400); }
-function save() { try { localStorage.setItem('mw_save', JSON.stringify({ b: [...blockMeshes.values()].map(m => [m.userData.cx, m.userData.cy, m.userData.cz, m.userData.c]), p: [P.pos.x, P.pos.y, P.pos.z, P.yaw], k: kills, m: money, u: up, sg: hasShotgun })); } catch (e) {} }
+function save() { try { localStorage.setItem('mw_save', JSON.stringify({ b: [...blockMeshes.values()].map(m => [m.userData.cx, m.userData.cy, m.userData.cz, m.userData.c]), p: [P.pos.x, P.pos.y, P.pos.z, P.yaw], k: kills, m: money, u: up, sg: hasShotgun, f: [...furn.values()].map(o => [o.cx, o.cy, o.cz, o.f, o.rot]) })); } catch (e) {} }
 setInterval(() => save(), 10000); addEventListener('beforeunload', save);
 
 // ---------- player ----------
@@ -202,9 +203,10 @@ let kills = 0, mode = 'build', inCar = null, lastHurt = -99, flashV = 0, clock =
 let wanted = 0, lastCrime = -99, calmT = 0, copT = 0, copLeaveT = 5; const crimeCD = {};
 let money = 0, up = { dmg: 0, hp: 0, spd: 0 }, hasShotgun = false, weapon = 'pistol', shopOpen = false;
 const maxHp = () => 100 + 25 * up.hp;
+let pendingFurn = null;
 try {
   const s = JSON.parse(localStorage.getItem('mw_save') || 'null');
-  if (s) { s.b.forEach(b => addBlock(b[0], b[1], b[2], b[3], false)); P.pos.set(s.p[0], s.p[1], s.p[2]); P.yaw = s.p[3]; kills = s.k || 0; money = s.m || 0; if (s.u) up = { dmg: s.u.dmg || 0, hp: s.u.hp || 0, spd: s.u.spd || 0 }; hasShotgun = !!s.sg; }
+  if (s) { s.b.forEach(b => addBlock(b[0], b[1], b[2], b[3], false)); P.pos.set(s.p[0], s.p[1], s.p[2]); P.yaw = s.p[3]; kills = s.k || 0; money = s.m || 0; if (s.u) up = { dmg: s.u.dmg || 0, hp: s.u.hp || 0, spd: s.u.spd || 0 }; hasShotgun = !!s.sg; pendingFurn = s.f || []; }
 } catch (e) {}
 const keys = {}; const joy = { x: 0, y: 0 };
 function hud() {
@@ -388,6 +390,7 @@ function expandPlan(plan) {
     const x0 = C('x', 24), y0 = C('y', 16), z0 = C('z', 24), w = S('w', 24), h = S('h', 16), d = S('d', 24), b = o.block in BIDX ? BIDX[o.block] : 0;
     switch (o.op) {
       case 'block': m.set(key(x0, y0, z0), b); break;
+      case 'furniture': if (o.type in FURN) m.set(key(x0, y0, z0), { f: o.type, rot: C('rot', 3) }); break;
       case 'fill': case 'box':
         for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) for (let z = z0; z < z0 + d; z++) { if (o.op === 'box' && o.hollow && !(x === x0 || x === x0 + w - 1 || z === z0 || z === z0 + d - 1)) continue; m.set(key(x, y, z), b); }
         break;
@@ -400,12 +403,16 @@ function expandPlan(plan) {
     }
     if (m.size > 900) break;
   }
-  const cells = [...m].map(([k, t]) => { const [x, y, z] = k.split(',').map(Number); return { x, y, z, t }; }).slice(0, 700);
+  const cells = [...m].map(([k, t]) => { const [x, y, z] = k.split(',').map(Number); return typeof t === 'object' ? { x, y, z, f: t.f, rot: t.rot } : { x, y, z, t }; }).slice(0, 700);
   return cells;
 }
 function rotCells(cells, r) {
   let W = 0, D = 0; for (const c of cells) { W = Math.max(W, c.x + 1); D = Math.max(D, c.z + 1); }
-  const out = cells.map(c => r === 0 ? { x: c.x, y: c.y, z: c.z, t: c.t } : r === 1 ? { x: D - 1 - c.z, y: c.y, z: c.x, t: c.t } : r === 2 ? { x: W - 1 - c.x, y: c.y, z: D - 1 - c.z, t: c.t } : { x: c.z, y: c.y, z: W - 1 - c.x, t: c.t });
+  const out = cells.map(c => {
+    const q = { ...c };
+    if (r === 1) { q.x = D - 1 - c.z; q.z = c.x; } else if (r === 2) { q.x = W - 1 - c.x; q.z = D - 1 - c.z; } else if (r === 3) { q.x = c.z; q.z = W - 1 - c.x; }
+    if (q.f) q.rot = (c.rot + r) % 4; return q;
+  });
   return { cells: out, W: r % 2 ? D : W, D: r % 2 ? W : D };
 }
 const FACE = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -425,7 +432,7 @@ function findSite(S, rx, rz) {
   }
   return null;
 }
-const HUT = [{ op: 'box', x: 0, y: 0, z: 0, w: 5, h: 2, d: 5, block: 'planks', hollow: true }, { op: 'hole', x: 2, y: 0, z: 0, w: 1, h: 1, d: 1 }, { op: 'fill', x: 1, y: 1, z: 0, w: 1, h: 1, d: 1, block: 'glass' }, { op: 'fill', x: 3, y: 1, z: 0, w: 1, h: 1, d: 1, block: 'glass' }, { op: 'roof', x: 0, y: 2, z: 0, w: 5, d: 5, block: 'roof', style: 'gable' }];
+const HUT = [{ op: 'box', x: 0, y: 0, z: 0, w: 5, h: 2, d: 5, block: 'planks', hollow: true }, { op: 'furniture', type: 'door', x: 2, y: 0, z: 0, rot: 0 }, { op: 'fill', x: 1, y: 1, z: 0, w: 1, h: 1, d: 1, block: 'glass' }, { op: 'fill', x: 3, y: 1, z: 0, w: 1, h: 1, d: 1, block: 'glass' }, { op: 'roof', x: 0, y: 2, z: 0, w: 5, d: 5, block: 'roof', style: 'gable' }, { op: 'furniture', type: 'bed', x: 3, y: 0, z: 3, rot: 0 }, { op: 'furniture', type: 'lamp', x: 1, y: 0, z: 3, rot: 0 }, { op: 'furniture', type: 'table', x: 1, y: 0, z: 1, rot: 0 }];
 
 function cellFree(cx, cy, cz) {
   const b = new THREE.Box3(new V3(cx * 2, cy * 2, cz * 2), new V3(cx * 2 + 2, cy * 2 + 2, cz * 2 + 2));
@@ -434,10 +441,11 @@ function cellFree(cx, cy, cz) {
   for (const e of enemies) if (!e.dead && hit(e, b)) return false;
   return true;
 }
-const has = c => blockMeshes.has(c.cx + ',' + c.cy + ',' + c.cz);
+const has = c => { const k = c.cx + ',' + c.cy + ',' + c.cz; return blockMeshes.has(k) || furn.has(k); };
+const costOf = c => c.f ? FURN[c.f] : { res: BLOCKS[c.t][1], n: 1 };
 const isGuard = n => n.role === 'guard' || (n.task && (n.task.type === 'guard' || n.task.type === 'protect'));
 function dropTask(n) { if (n.task && n.task.cur && n.task.st) { n.task.st.retry.push(n.task.cur); n.task.cur = null; } }
-function remainingNeed(t) { const need = { wood: 0, stone: 0, sand: 0 }, st = t.st, add = c => { need[COSTRES(c.t)]++; }; if (t.cur) add(t.cur); for (let i = st.next; i < st.cells.length; i++) add(st.cells[i]); st.retry.forEach(add); return need; }
+function remainingNeed(t) { const need = { wood: 0, stone: 0, sand: 0 }, st = t.st, add = c => { const k = costOf(c); need[k.res] += k.n; }; if (t.cur) add(t.cur); for (let i = st.next; i < st.cells.length; i++) add(st.cells[i]); st.retry.forEach(add); return need; }
 
 function setTask(n, t) {
   if (!t || typeof t !== 'object') return;
@@ -461,7 +469,7 @@ function setTask(n, t) {
     const cells0 = expandPlan(t.plan);
     if (cells0.length < 4) { ev(n.name + "'s plan was empty or too small, ignoring"); n.task = null; return; }
     let mnx = 1e9, mny = 1e9, mnz = 1e9; for (const c of cells0) { mnx = Math.min(mnx, c.x); mny = Math.min(mny, c.y); mnz = Math.min(mnz, c.z); }
-    const norm = cells0.map(c => ({ x: c.x - mnx, y: c.y - mny, z: c.z - mnz, t: c.t }));
+    const norm = cells0.map(c => ({ ...c, x: c.x - mnx, y: c.y - mny, z: c.z - mnz }));
     let W = 0, D = 0; for (const c of norm) { W = Math.max(W, c.x + 1); D = Math.max(D, c.z + 1); }
     const S = Math.max(W, D), toMe = String(t.where || '').includes('me');
     const ref = toMe ? n.pos : P.pos, rx = ref.x + (+t.dx || 0), rz = ref.z + (+t.dz || 0);
@@ -470,7 +478,7 @@ function setTask(n, t) {
     const cxm = (site.x0 + S / 2) * 2, czm = (site.z0 + S / 2) * 2;
     let r = 0; if (t.face_player !== false) { const vx = P.pos.x - cxm, vz = P.pos.z - czm; let bd = -9; FACE.forEach((f, i) => { const dd = f[0] * vx + f[1] * vz; if (dd > bd) { bd = dd; r = i; } }); }
     const rot = rotCells(norm, r), ox = site.x0 + Math.floor((S - rot.W) / 2), oz = site.z0 + Math.floor((S - rot.D) / 2);
-    const cells = rot.cells.map(c => ({ cx: ox + c.x, cy: c.y, cz: oz + c.z, t: c.t })).sort((a, b) => a.cy - b.cy || a.cz - b.cz || a.cx - b.cx);
+    const cells = rot.cells.map(c => ({ cx: ox + c.x, cy: c.y, cz: oz + c.z, t: c.t, f: c.f, rot: c.rot })).sort((a, b) => (a.f ? 1 : 0) - (b.f ? 1 : 0) || a.cy - b.cy || a.cz - b.cz || a.cx - b.cx);
     reserved.push(new THREE.Box3(new V3(site.x0 * 2 - 2, 0, site.z0 * 2 - 2), new V3((site.x0 + S) * 2 + 2, 60, (site.z0 + S) * 2 + 2)));
     const st = { name: String(t.name || 'Building').slice(0, 30), by: n.name, status: 'building', done: 0, total: cells.length, cells, next: 0, retry: [] };
     structures.push(st);
@@ -535,18 +543,18 @@ function npcStep(n, dt) {
       if (!npcs.some(o => o !== n && o.task && o.task.st === st && o.task.cur)) st.status = 'complete';
       finish(n, (t.type === 'assist' ? 'helped finish ' : 'finished building ') + st.name); return;
     }
-    const c = t.cur, res = COSTRES(c.t);
-    if (n.inv[res] < 1) {
+    const c = t.cur, kc = costOf(c), res = kc.res;
+    if (n.inv[res] < kc.n) {
       const need = Math.ceil(remainingNeed(t)[res] / Math.max(1, npcs.filter(o => o.task && o.task.st === st).length)), amount = Math.min(60, n.inv[res] + Math.max(5, need));
       n.sub = { res, amount }; n.gnode = null; ev(`${n.name} needs ${need} more ${res} for ${st.name}, going to gather`); return;
     }
     const wx = c.cx * 2 + 1, wz = c.cz * 2 + 1;
     n.status = `${t.type === 'assist' ? 'helping build' : 'building'} ${st.name} ${st.done}/${st.total}`;
-    if (dist2(n.pos, { x: wx, z: wz }) > 6.5 || Math.abs(n.pos.y - c.cy * 2) > 9) { walkTo(n, wx, wz, dt, 5); return; }
+    if (dist2(n.pos, { x: wx, z: wz }) > (c.f ? 9 : 6.5) || Math.abs(n.pos.y - c.cy * 2) > 9) { walkTo(n, wx, wz, dt, c.f ? 7 : 5); return; }
     phys(n, 0, 0, dt); n.working = true; n.face = Math.atan2(wx - n.pos.x, wz - n.pos.z); n.work += dt;
     if (n.work >= 0.35) {
       if (!cellFree(c.cx, c.cy, c.cz)) { t.stuckSkip += 0.35; if (t.stuckSkip > 4) { t.stuckSkip = 0; st.done++; t.cur = null; } n.work = 0.3; return; }
-      n.work = 0; t.stuckSkip = 0; addBlock(c.cx, c.cy, c.cz, c.t, true, true); sfxAt(n.pos, 'npcplace'); n.inv[res]--; st.done++; t.cur = null;
+      n.work = 0; t.stuckSkip = 0; if (c.f) addFurniture(c.cx, c.cy, c.cz, c.f, c.rot, true); else addBlock(c.cx, c.cy, c.cz, c.t, true, true); sfxAt(n.pos, 'npcplace'); n.inv[res] -= kc.n; st.done++; t.cur = null;
       beam(new V3(n.pos.x, n.pos.y + 1.4, n.pos.z), new V3(wx, c.cy * 2 + 1, wz), 0x66ddff, 120);
     }
   }
@@ -572,9 +580,9 @@ WORLD: 1 block = 2m. N=-z, S=+z, E=+x, W=-x. Resources: wood (trees), stone (roc
 REPLY FORMAT: {"npcs":[{"id":"archie","thought":"...","say":"...","task":{...}}]}  Include only NPCs that speak or change task. Omit task to keep the current one.
 TASKS: {"type":"idle"} {"type":"wander"} {"type":"follow"} {"type":"guard"} {"type":"gather","resource":"wood|stone|sand","amount":20} {"type":"build","name":"Cottage","where":"near_player|near_me","dx":0,"dz":0,"plan":[ops]} (dx,dz optional offset in meters from the reference point). {"type":"assist","with":"archie"} joins another NPC's build and splits the blocks with them. {"type":"protect","who":"archie"} guards a teammate and fights thugs near them. Any NPC entry may include "then":[task,...] (max 4) to queue follow-up tasks.
 TEAMWORK: act as a crew, not as individuals. The architect designs and starts a build; builders ASSIST (blocks and material gathering are shared, so it goes faster); the guard PROTECTS the builders. React to teammates' events. If the player asks for something big (a village, a base), split it into several buildings across NPCs and queue follow-ups.
-PLAN OPS (integer cells; x,z horizontal; y up; y=0 is the ground layer; stay within 24x16x24): {"op":"box","x":0,"y":0,"z":0,"w":6,"h":3,"d":6,"block":"brick","hollow":true} (hollow = walls only); {"op":"fill","x","y","z","w","h","d","block"}; {"op":"roof","x","y","z","w","d","block","style":"gable|flat"} (gable ridge runs along x); {"op":"hole","x","y","z","w","h","d"} deletes cells (doors, windows); {"op":"block","x","y","z","block"}; {"op":"floor","x","y","z","w","d","block"}. Later ops override earlier ones. The wall at z=0 is the FRONT; the game rotates the building so the front faces the player.
-ARCHITECTURE RULES: design real buildings with walls, a door (hole 1 wide 1 high at ground level in the front wall), windows (glass fill at y=1), and a roof covering all walls (roof y = wall height). Sensible sizes (house about 6x3x6 cells). Nothing floating. Pick materials that match what you have and what resource nodes are near, and say why.
-EXAMPLE house: [{"op":"box","x":0,"y":0,"z":0,"w":6,"h":3,"d":6,"block":"brick","hollow":true},{"op":"hole","x":2,"y":0,"z":0,"w":1,"h":1,"d":1},{"op":"fill","x":1,"y":1,"z":0,"w":1,"h":1,"d":1,"block":"glass"},{"op":"fill","x":4,"y":1,"z":0,"w":1,"h":1,"d":1,"block":"glass"},{"op":"roof","x":0,"y":3,"z":0,"w":6,"d":6,"block":"roof","style":"gable"}]`;
+PLAN OPS (integer cells; x,z horizontal; y up; y=0 is the ground layer; stay within 24x16x24): {"op":"box","x":0,"y":0,"z":0,"w":6,"h":3,"d":6,"block":"brick","hollow":true} (hollow = walls only); {"op":"fill","x","y","z","w","h","d","block"}; {"op":"roof","x","y","z","w","d","block","style":"gable|flat"} (gable ridge runs along x); {"op":"hole","x","y","z","w","h","d"} deletes cells (doors, windows); {"op":"block","x","y","z","block"}; {"op":"floor","x","y","z","w","d","block"}; {"op":"furniture","type":"bed|table|chair|lamp|shelf|rug|plant|door","x","y","z","rot":0} places ONE furniture piece in one cell (cost: bed 3 wood, table 2 wood, chair 1 wood, shelf 2 wood, rug 1 wood, plant 1 wood, lamp 1 sand, door 2 wood). A real door is {"op":"furniture","type":"door","x":2,"y":0,"z":0,"rot":0}: rot 0 for doors in walls running along x (front/back walls), rot 1 for side walls; it opens by itself when someone walks up. rot 0-3 turns other furniture. Later ops override earlier ones. The wall at z=0 is the FRONT; the game rotates the building so the front faces the player.
+ARCHITECTURE RULES: design real buildings with walls, a door (a door furniture piece at ground level in the front wall), windows (glass fill at y=1), a roof covering all walls (roof y = wall height), and a furnished interior (bed, table with chairs, lamp, shelf, rug, plant) inside the walls, never on wall cells, keeping a clear path from the door. Sensible sizes (house about 6x3x6 cells). Nothing floating. Pick materials that match what you have and what resource nodes are near, and say why.
+EXAMPLE house: [{"op":"box","x":0,"y":0,"z":0,"w":6,"h":3,"d":6,"block":"brick","hollow":true},{"op":"furniture","type":"door","x":2,"y":0,"z":0,"rot":0},{"op":"fill","x":1,"y":1,"z":0,"w":1,"h":1,"d":1,"block":"glass"},{"op":"fill","x":4,"y":1,"z":0,"w":1,"h":1,"d":1,"block":"glass"},{"op":"roof","x":0,"y":3,"z":0,"w":6,"d":6,"block":"roof","style":"gable"},{"op":"furniture","type":"bed","x":4,"y":0,"z":4,"rot":0},{"op":"furniture","type":"table","x":1,"y":0,"z":3,"rot":0},{"op":"furniture","type":"chair","x":1,"y":0,"z":2,"rot":1},{"op":"furniture","type":"lamp","x":1,"y":0,"z":4,"rot":0},{"op":"furniture","type":"shelf","x":3,"y":0,"z":4,"rot":0}]`;
 let aiBusy = false, aiFail = 0, lastAI = performance.now() - 20000, pendingMsg = null;
 const setStat = t => { $('aistat').textContent = t; };
 setStat(REL.key ? 'AI: ready' : 'AI: no key (⚙) · scripted mode');
@@ -672,7 +680,7 @@ function place() {
   if (hit(P, new THREE.Box3(new V3(cx * 2, cy * 2, cz * 2), new V3(cx * 2 + 2, cy * 2 + 2, cz * 2 + 2)))) return;
   addBlock(cx, cy, cz, sel); sfx('place');
 }
-function brk() { const h = aim(); if (h && h.object.userData.k) { delBlock(h.object.userData.k); sfx('brk'); } }
+function brk() { const h = aim(); if (!h) return; if (h.object.userData.k) { delBlock(h.object.userData.k); sfx('brk'); } else if (h.object.userData.fk) { delFurniture(h.object.userData.fk); sfx('brk'); } }
 function tracer(to) {
   const g = new THREE.BufferGeometry().setFromPoints([cam.localToWorld(new V3(0.3, -0.25, -0.8)), to]);
   const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xffee88 })); scene.add(l); setTimeout(() => { scene.remove(l); g.dispose(); }, 70);
@@ -787,6 +795,54 @@ function updateSky(dt) {
 }
 setInterval(() => { const h = Math.floor(dayT * 24), m = Math.floor((dayT * 24 - h) * 60); $('ver').textContent = 'v' + VER + ' · ' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }, 1000);
 updateSky(0);
+
+// ---------- furniture + doors ----------
+const FURN = { bed: { res: 'wood', n: 3 }, table: { res: 'wood', n: 2 }, chair: { res: 'wood', n: 1 }, lamp: { res: 'sand', n: 1 }, shelf: { res: 'wood', n: 2 }, rug: { res: 'wood', n: 1 }, plant: { res: 'wood', n: 1 }, door: { res: 'wood', n: 2 } };
+const fmc = {}, FM = c => fmc[c] || (fmc[c] = new THREE.MeshLambertMaterial({ color: c }));
+function bx(g, w, h, d, x, y, z, col) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), FM(col)); m.position.set(x, y, z); g.add(m); return m; }
+function mkFurn(type, g) {
+  const legs = (w, d, h, col, th) => { for (const sx of [-1, 1]) for (const sz of [-1, 1]) bx(g, th, h, th, sx * w, h / 2, sz * d, col); };
+  switch (type) {
+    case 'bed': bx(g, 1.8, 0.45, 1.9, 0, 0.225, 0, 0x6b4423); bx(g, 1.7, 0.22, 1.3, 0, 0.56, 0.3, 0xf2f2f2); bx(g, 1.0, 0.14, 0.4, 0, 0.7, -0.65, 0x4dabf7); bx(g, 1.8, 0.9, 0.12, 0, 0.7, -0.95, 0x6b4423); break;
+    case 'table': bx(g, 1.8, 0.12, 1.2, 0, 0.85, 0, 0x9c6b3a); legs(0.8, 0.5, 0.85, 0x7a5230, 0.12); break;
+    case 'chair': bx(g, 0.7, 0.1, 0.7, 0, 0.45, 0, 0x9c6b3a); bx(g, 0.7, 0.6, 0.1, 0, 0.8, -0.3, 0x9c6b3a); legs(0.28, 0.28, 0.45, 0x7a5230, 0.08); break;
+    case 'lamp': bx(g, 0.5, 0.08, 0.5, 0, 0.04, 0, 0x333333); bx(g, 0.06, 1.5, 0.06, 0, 0.8, 0, 0x555555); { const sp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe9a0 })); sp.position.y = 1.7; g.add(sp); } break;
+    case 'shelf': bx(g, 1.8, 1.8, 0.1, 0, 0.9, -0.85, 0x5a3b1f); bx(g, 0.1, 1.8, 0.4, -0.85, 0.9, -0.7, 0x5a3b1f); bx(g, 0.1, 1.8, 0.4, 0.85, 0.9, -0.7, 0x5a3b1f);
+      for (const y of [0.05, 0.6, 1.15, 1.75]) bx(g, 1.8, 0.08, 0.4, 0, y, -0.7, 0x8b5a2b);
+      for (const y of [0.1, 0.65, 1.2]) for (let i = 0; i < 5; i++) bx(g, 0.18, 0.35 + (i % 2) * 0.1, 0.25, -0.65 + i * 0.32, y + 0.22, -0.7, [0xc0392b, 0x2980b9, 0x27ae60, 0xf1c40f, 0x8e44ad][i]); break;
+    case 'rug': bx(g, 1.7, 0.03, 1.7, 0, 0.02, 0, 0xb03a48); bx(g, 1.2, 0.035, 1.2, 0, 0.025, 0, 0xe8c07a); break;
+    case 'plant': { const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.22, 0.4, 10), FM(0xb5651d)); pot.position.y = 0.2; g.add(pot); const lf = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 8), FM(0x2f8f3f)); lf.position.y = 0.85; g.add(lf); } break;
+  }
+}
+function addFurniture(cx, cy, cz, type, rot = 0, anim = false, doSave = true) {
+  const k = cx + ',' + cy + ',' + cz;
+  if (!FURN[type] || furn.has(k) || blockMeshes.has(k)) return false;
+  const g = new THREE.Group(), x = cx * 2 + 1, z = cz * 2 + 1, y = cy * 2; let pivot = null;
+  if (type === 'door') { pivot = new THREE.Group(); pivot.position.set(-0.9, 0, 0); bx(pivot, 1.8, 1.95, 0.16, 0.9, 0.975, 0, 0x8b5a2b); bx(pivot, 0.1, 0.1, 0.22, 1.55, 0.95, 0, 0xd4af37); g.add(pivot); } else mkFurn(type, g);
+  g.position.set(x, y, z); g.rotation.y = -rot * Math.PI / 2; scene.add(g); g.updateMatrixWorld(true);
+  const o = { k, cx, cy, cz, f: type, rot, grp: g, pivot, meshes: [] };
+  g.traverse(m => { if (m.isMesh) { m.userData.fk = k; targets.push(m); o.meshes.push(m); } });
+  furn.set(k, o);
+  if (type === 'door') { const al = rot % 2 === 0, hw = al ? 0.9 : 0.1, hd = al ? 0.1 : 0.9; o.box = new THREE.Box3(new V3(x - hw, y, z - hd), new V3(x + hw, y + 1.95, z + hd)); o.open = 0; o.solid = true; solids.set('d' + k, o.box); doors.push(o); }
+  if (anim) { g.scale.setScalar(0.3); grow.push({ m: g, t: 0 }); }
+  if (doSave) queueSave();
+  return true;
+}
+function delFurniture(k) {
+  const o = furn.get(k); if (!o) return;
+  scene.remove(o.grp); o.meshes.forEach(m => { const i = targets.indexOf(m); if (i >= 0) targets.splice(i, 1); });
+  furn.delete(k); if (o.f === 'door') { doors.splice(doors.indexOf(o), 1); solids.delete('d' + k); } queueSave();
+}
+function updateDoors(dt) {
+  for (const d of doors) {
+    const cx = d.cx * 2 + 1, cz = d.cz * 2 + 1, cy = d.cy * 2; let near = false;
+    const chk = p => { if (Math.abs(p.x - cx) < 3.2 && Math.abs(p.z - cz) < 3.2 && Math.abs(p.y - cy) < 3) near = true; };
+    if (!inCar) chk(P.pos); for (const n of npcs) chk(n.pos); for (const e of enemies) if (!e.dead) chk(e.pos); for (const e of cops) if (!e.dead) chk(e.pos);
+    d.open += ((near ? 1 : 0) - d.open) * Math.min(1, dt * 8); d.pivot.rotation.y = d.open * 1.55;
+    if (d.open > 0.5 && d.solid) { solids.delete('d' + d.k); d.solid = false; } else if (d.open <= 0.5 && !d.solid) { solids.set('d' + d.k, d.box); d.solid = true; }
+  }
+}
+if (pendingFurn) pendingFurn.forEach(a => addFurniture(a[0], a[1], a[2], a[3], a[4], false, false));
 
 // ---------- police / wanted ----------
 const cops = [], copRay = new THREE.Raycaster();
@@ -938,6 +994,7 @@ ren.setAnimationLoop(now => {
     if (calmT > 10 || clock - lastCrime > 60) { wanted--; calmT = 0; lastCrime = clock; hudStars(); }
   } else if (cops.length) { copLeaveT -= dt; if (copLeaveT <= 0) clearCops(); }
   for (const n of npcs) npcStep(n, dt);
+  updateDoors(dt);
   cam.updateMatrixWorld();
   for (const n of npcs) npcVisuals(n, dt);
   for (let i = grow.length - 1; i >= 0; i--) { const g = grow[i]; g.t += dt * 4; const s = Math.min(1, 0.2 + g.t); g.m.scale.setScalar(s); if (s >= 1) grow.splice(i, 1); }
