@@ -160,6 +160,7 @@ function sfx(n, v = 1) {
     case 'chop': noise(0.07, 0.35 * v, 700); tone(180, 120, 0.05, 'square', 0.12 * v); break;
     case 'mine': tone(1200, 700, 0.04, 'square', 0.12 * v); noise(0.05, 0.3 * v, 2500, 'highpass'); break;
     case 'crash': noise(0.25, 0.6 * v, 600); tone(100, 40, 0.25, 'sawtooth', 0.3 * v); break;
+    case 'siren': tone(600, 900, 0.35, 'sine', 0.2 * v); setTimeout(() => tone(900, 600, 0.35, 'sine', 0.2 * v), 350); break;
     case 'step': noise(0.04, 0.1 * v, 450); break;
   }
 }
@@ -198,6 +199,7 @@ setInterval(() => save(), 10000); addEventListener('beforeunload', save);
 // ---------- player ----------
 const P = mkEnt(25, 1, 25, 0.35, 1.7); P.yaw = 0; P.pitch = 0; P.hp = 100;
 let kills = 0, mode = 'build', inCar = null, lastHurt = -99, flashV = 0, clock = 0;
+let wanted = 0, lastCrime = -99, calmT = 0, copT = 0, copLeaveT = 5; const crimeCD = {};
 let money = 0, up = { dmg: 0, hp: 0, spd: 0 }, hasShotgun = false, weapon = 'pistol', shopOpen = false;
 const maxHp = () => 100 + 25 * up.hp;
 try {
@@ -215,10 +217,10 @@ function hud() {
 selBlock(0);
 let msgT = 0;
 function msg(t, ms = 1800) { const m = $('msg'); m.textContent = t; m.style.display = 'block'; clearTimeout(msgT); msgT = setTimeout(() => m.style.display = 'none', ms); }
-function hurt(n) {
-  if (inCar || shopOpen) return;
+function hurt(n, force) {
+  if ((inCar && !force) || shopOpen) return;
   P.hp -= n; lastHurt = clock; flashV = 0.45; sfx('hurt');
-  if (P.hp <= 0) { P.hp = maxHp(); P.pos.set(25, 1, 25); P.vel.set(0, 0, 0); msg('YOU DIED'); sfx('die'); flashV = 0.8; }
+  if (P.hp <= 0) { wanted = 0; clearCops(); hudStars(); P.hp = maxHp(); P.pos.set(25, 1, 25); P.vel.set(0, 0, 0); msg('YOU DIED'); sfx('die'); flashV = 0.8; }
   hud();
 }
 function jump() { if (P.ground) { P.vel.y = 11; P.ground = false; } }
@@ -237,14 +239,14 @@ function playerStep(dt) {
 
 // ---------- cars ----------
 const cars = [];
-function mkCar(x, z, h, col) {
+function mkCar(x, z, h, col, owned = false) {
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(2, 0.8, 4.2), new THREE.MeshLambertMaterial({ color: col })); body.position.y = 0.7; g.add(body);
   const cab = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.7, 2), new THREE.MeshLambertMaterial({ color: 0x223344 })); cab.position.set(0, 1.4, -0.2); g.add(cab);
   const wm = new THREE.MeshLambertMaterial({ color: 0x111111 }), wg = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 12);
   for (const [wx, wz] of [[-1, 1.3], [1, 1.3], [-1, -1.3], [1, -1.3]]) { const w = new THREE.Mesh(wg, wm); w.rotation.z = Math.PI / 2; w.position.set(wx, 0.4, wz); g.add(w); }
   g.position.set(x, 0, z); g.rotation.y = h; scene.add(g);
-  cars.push({ mesh: g, pos: new V3(x, 0, z), h, speed: 0 });
+  const car = { mesh: g, pos: new V3(x, 0, z), h, speed: 0, owned }; cars.push(car); return car;
 }
 mkCar(25, 45, 0, 0xd62828); mkCar(45, 25, Math.PI / 2, 0x2a9d8f); mkCar(-25, -5, 0, 0xf4a261); mkCar(75, -25, Math.PI / 2, 0x6a4c93);
 function toggleCar() {
@@ -252,7 +254,7 @@ function toggleCar() {
   if (inCar) { const c = inCar; inCar = null; c.speed = 0; stopEngine(); P.pos.set(c.pos.x + Math.cos(c.h) * 3, 0, c.pos.z - Math.sin(c.h) * 3); P.vel.set(0, 0, 0); P.yaw = c.h + Math.PI; P.pitch = 0; return; }
   let best = null, bd = 5;
   for (const c of cars) { const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; best = c; } }
-  if (best) { inCar = best; startEngine(); msg('W/S drive, A/D steer, Space brake, E exit', 2500); } else msg('No car nearby', 900);
+  if (best) { inCar = best; startEngine(); if (!best.owned && !best.stolen) { best.stolen = true; crime(1, 'car theft'); } msg('W/S drive, A/D steer, Space brake, E exit', 2500); } else msg('No car nearby', 900);
 }
 function driveCar(dt) {
   const c = inCar, thr = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - joy.y, steer = (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) - joy.x;
@@ -262,9 +264,9 @@ function driveCar(dt) {
   c.h += steer * 1.8 * dt * Math.max(-1, Math.min(1, c.speed / 5));
   const t = { pos: new V3(c.pos.x + Math.sin(c.h) * c.speed * dt, 0, c.pos.z + Math.cos(c.h) * c.speed * dt), R: 1.3, H: 1.2 };
   let bad = false; for (const b of solids.values()) if (hit(t, b)) { bad = true; break; }
-  if (bad) { if (Math.abs(c.speed) > 4) sfx('crash'); c.speed *= -0.3; } else c.pos.copy(t.pos);
+  if (bad) { if (Math.abs(c.speed) > 12) crime(1, 'reckless driving', 'crash', 1); if (Math.abs(c.speed) > 4) sfx('crash'); c.speed *= -0.3; } else c.pos.copy(t.pos);
   c.mesh.position.copy(c.pos); c.mesh.rotation.y = c.h;
-  if (Math.abs(c.speed) > 6) for (const e of enemies) if (!e.dead && dist2(e.pos, c.pos) < 2.3) damageEnemy(e, 100);
+  if (Math.abs(c.speed) > 6) for (const e of [...enemies, ...cops]) if (!e.dead && dist2(e.pos, c.pos) < 2.3) damageEnemy(e, 100);
   P.pos.copy(c.pos);
   cam.position.set(c.pos.x - Math.sin(c.h) * 7.5, 3.8, c.pos.z - Math.cos(c.h) * 7.5); cam.lookAt(c.pos.x, 1.2, c.pos.z);
 }
@@ -292,8 +294,8 @@ function spawnEnemy() {
 }
 function damageEnemy(e, n, quiet) {
   if (e.dead) return;
-  e.hp -= n; e.hurt = 0.12; sfxAt(e.pos, 'hit');
-  if (e.hp <= 0) { sfxAt(e.pos, 'edie'); e.dead = true; scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); if (!quiet) { kills++; money += 25; hud(); } }
+  e.hp -= n; e.hurt = 0.12; if (e.cop && !quiet) crime(1, 'attacked a cop', 'copHit'); sfxAt(e.pos, 'hit');
+  if (e.hp <= 0) { sfxAt(e.pos, 'edie'); e.dead = true; scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); if (e.cop) { if (!quiet) crime(1, 'killed a cop', 'copKill'); } else if (!quiet) { kills++; money += 25; hud(); } }
 }
 function enemyStep(e, dt) {
   let T = inCar ? inCar.pos : P.pos, npc = null;
@@ -765,6 +767,52 @@ function updateSky(dt) {
 setInterval(() => { const h = Math.floor(dayT * 24), m = Math.floor((dayT * 24 - h) * 60); $('ver').textContent = 'v' + VER + ' · ' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }, 1000);
 updateSky(0);
 
+// ---------- police / wanted ----------
+const cops = [], copRay = new THREE.Raycaster();
+function hudStars() { const el = $('stars'); el.style.display = wanted ? 'block' : 'none'; el.textContent = '★'.repeat(wanted) + '☆'.repeat(3 - wanted); }
+function crime(n, why, key, cap = 3) {
+  if (key) { if (clock - (crimeCD[key] || -99) < 8) return; crimeCD[key] = clock; }
+  const before = wanted; wanted = Math.max(wanted, Math.min(cap, wanted + n)); lastCrime = clock; calmT = 0;
+  if (wanted > before) { hudStars(); msg('WANTED: ' + why, 1800); sfx('siren'); }
+}
+function beam(a, b, col, ms) { const g = new THREE.BufferGeometry().setFromPoints([a, b]), l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: col })); scene.add(l); setTimeout(() => { scene.remove(l); g.dispose(); }, ms); }
+function mkCop(x, z) {
+  const g = new THREE.Group(), tm = new THREE.MeshLambertMaterial({ color: 0x1d3a8a });
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.4), new THREE.MeshLambertMaterial({ color: 0x14213d })); legs.position.y = 0.35;
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.5), tm); torso.position.y = 1.1;
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), new THREE.MeshLambertMaterial({ color: 0xe0b48f })); head.position.y = 1.75;
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.18, 0.55), new THREE.MeshLambertMaterial({ color: 0x0b1d4a })); cap.position.y = 2.05;
+  const badge = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.05), new THREE.MeshLambertMaterial({ color: 0xffd400 })); badge.position.set(0.2, 1.3, 0.27);
+  g.add(legs, torso, head, cap, badge); g.position.set(x, 0, z); scene.add(g);
+  const e = { ...mkEnt(x, 0, z, 0.4, 1.95), mesh: g, hp: 80, mat: tm, col: 0x1d3a8a, hurt: 0, cd: 1, dead: false, cop: true };
+  [legs, torso, head, cap].forEach(m => { m.userData.enemy = e; enemyMeshes.push(m); }); head.userData.head = true; cops.push(e);
+}
+function spawnCop() {
+  for (let t = 0; t < 12; t++) {
+    const v = Math.random() < 0.5, k = Math.floor(Math.random() * 16) - 8, a = (v ? P.pos.z : P.pos.x) + (Math.random() - 0.5) * 140;
+    const x = v ? k * 50 + 25 : a, z = v ? a : k * 50 + 25, d = Math.hypot(x - P.pos.x, z - P.pos.z);
+    if (d < 35 || d > 75) continue; mkCop(x, z); return;
+  }
+}
+function clearCops() { for (const e of cops) { scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); } cops.length = 0; }
+function copStep(e, dt) {
+  const T = inCar ? inCar.pos : P.pos, dx = T.x - e.pos.x, dz = T.z - e.pos.z, d = Math.hypot(dx, dz);
+  if (d > 160) { e.hp = 0; e.dead = true; scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); return; }
+  const sp = 5.8 + wanted * 0.6, mx = d > 7 ? dx / d : 0, mz = d > 7 ? dz / d : 0, ox = e.pos.x, oz = e.pos.z;
+  phys(e, mx * sp, mz * sp, dt);
+  if (e.ground && (mx || mz) && Math.hypot(e.pos.x - ox, e.pos.z - oz) < sp * dt * 0.3) e.vel.y = 11;
+  e.mesh.position.copy(e.pos); e.mesh.rotation.y = Math.atan2(dx, dz);
+  e.hurt -= dt; e.mat.color.setHex(e.hurt > 0 ? 0xffffff : e.col); e.cd -= dt;
+  if (e.cd > 0) return;
+  if (d < 2 && !inCar) { hurt(10, true); e.cd = 0.8; return; }
+  if (d < 26) {
+    e.cd = 1.1 + Math.random() * 0.5;
+    const o = new V3(e.pos.x, 1.6, e.pos.z), tg = new V3(T.x, inCar ? 1.2 : P.pos.y + 1.2, T.z), dir = tg.clone().sub(o), dl = dir.length(); dir.normalize();
+    copRay.set(o, dir); copRay.far = dl; if (copRay.intersectObjects(targets, false)[0]) return;
+    sfxAt(e.pos, 'shoot'); beam(o, tg, 0xff5555, 80); if (Math.random() < 0.35) hurt(8, true);
+  }
+}
+
 // ---------- shop ----------
 const SHOP = { x: 36, z: 22 };
 let hintOn = false;
@@ -787,7 +835,7 @@ function spawnCarNearby() {
   for (const a of [0, 1.57, -1.57, 3.14]) {
     const x = P.pos.x - Math.sin(P.yaw + a) * 8, z = P.pos.z - Math.cos(P.yaw + a) * 8, t = { pos: new V3(x, 0, z), R: 2, H: 1.2 };
     let bad = false; for (const b of solids.values()) if (hit(t, b)) { bad = true; break; }
-    if (!bad) { mkCar(x, z, P.yaw + a + Math.PI, [0xff6b6b, 0x4dabf7, 0xffd43b, 0x69db7c, 0xda77f2][Math.floor(Math.random() * 5)]); return true; }
+    if (!bad) { mkCar(x, z, P.yaw + a + Math.PI, [0xff6b6b, 0x4dabf7, 0xffd43b, 0x69db7c, 0xda77f2][Math.floor(Math.random() * 5)], true); return true; }
   }
   return false;
 }
@@ -838,6 +886,7 @@ function drawMini() {
   const dot = (x, z, col, r, clamp) => { const [sx, sy, inside] = toS(x, z, clamp); if (!inside && !clamp) return; mg.fillStyle = col; mg.beginPath(); mg.arc(sx, sy, r, 0, 6.2832); mg.fill(); };
   for (const nd of nodes) if (nd.left > 0) dot(nd.pos.x, nd.pos.z, nd.type === 'wood' ? '#2ecc40' : nd.type === 'stone' ? '#e0e0e0' : '#f1c40f', 4, false);
   for (const e of enemies) if (!e.dead) dot(e.pos.x, e.pos.z, '#ff3b30', 5, false);
+  for (const e of cops) if (!e.dead) dot(e.pos.x, e.pos.z, '#3b82f6', 6, false);
   dot(SHOP.x, SHOP.z, '#ffd400', 7, true);
   for (const cr of cars) { const [sx, sy, inside] = toS(cr.pos.x, cr.pos.z); if (inside) { mg.fillStyle = '#fff'; mg.fillRect(sx - 4, sy - 4, 8, 8); } }
   for (const n of npcs) { const [sx, sy] = toS(n.pos.x, n.pos.z, true); mg.fillStyle = '#' + n.col.toString(16).padStart(6, '0'); mg.beginPath(); mg.arc(sx, sy, 8, 0, 6.2832); mg.fill(); mg.strokeStyle = '#fff'; mg.lineWidth = 2; mg.stroke(); mg.fillStyle = '#fff'; mg.font = 'bold 12px sans-serif'; mg.textAlign = 'center'; mg.fillText(n.name[0], sx, sy + 4); }
@@ -861,6 +910,12 @@ ren.setAnimationLoop(now => {
   if (held && mode === 'fight' && !inCar) shoot();
   for (let i = enemies.length - 1; i >= 0; i--) { if (enemies[i].dead) enemies.splice(i, 1); else enemyStep(enemies[i], dt); }
   spawnT -= dt; if (spawnT <= 0 && enemies.length < 10) { spawnEnemy(); spawnT = 3; }
+  for (let i = cops.length - 1; i >= 0; i--) { if (cops[i].dead) cops.splice(i, 1); else copStep(cops[i], dt); }
+  if (wanted > 0) {
+    copLeaveT = 5; copT -= dt; if (copT <= 0 && cops.length < wanted * 2) { spawnCop(); copT = 1.5; }
+    calmT = cops.some(c => dist2(c.pos, P.pos) < 60) ? 0 : calmT + dt;
+    if (calmT > 10 || clock - lastCrime > 60) { wanted--; calmT = 0; lastCrime = clock; hudStars(); }
+  } else if (cops.length) { copLeaveT -= dt; if (copLeaveT <= 0) clearCops(); }
   for (const n of npcs) npcStep(n, dt);
   cam.updateMatrixWorld();
   for (const n of npcs) npcVisuals(n, dt);

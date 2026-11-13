@@ -45,13 +45,15 @@ canvas{display:block}
 #shop button{padding:8px 14px;border-radius:8px;border:0;background:#2e86de;color:#fff;font-size:14px}
 #shop button:disabled{background:#555;opacity:.6}
 #hint{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#000a;color:#ffd400;padding:6px 12px;border-radius:8px;font-size:14px;display:none;pointer-events:none}
+#stars{position:fixed;top:4px;left:50%;transform:translateX(-50%);color:#ff3b30;font-size:26px;text-shadow:0 2px 4px #000;display:none;letter-spacing:4px;animation:bl 1s infinite;pointer-events:none}
+@keyframes bl{50%{opacity:.5}}
 #gear{position:fixed;top:1px;right:62px;font-size:18px;background:none;border:0;color:#fff;z-index:9}
 #chatbtn{left:30px;bottom:150px}
 </style></head><body>
 <div id="cross"></div><div id="hot"></div><div id="ver"></div><div id="upd"></div>
 <div id="help"><br><br><br>WASD move · Shift run · Space jump · Q build/fight · E car · T chat · M mute<br>BUILD: click place, right-click break, 1-6 block<br>FIGHT: click shoot, F or right-click punch · R switch gun</div>
 <div id="hp"><i></i></div><div id="info"></div><div id="flash"></div><div id="msg"></div>
-<canvas id="mini"></canvas><div id="hint"></div>
+<canvas id="mini"></canvas><div id="hint"></div><div id="stars"></div>
 <div id="shop"><b>$ SHOP</b> <span id="shopmoney" style="float:right"></span><div id="shopitems"></div><button id="shopclose">Close</button></div>
 <div id="labels"></div><div id="aistat"></div><div id="log"></div>
 <button id="gear">⚙</button><button id="mute">🔊</button>
