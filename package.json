@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "dist": "vite build && electron-builder --win --publish never"
+    "dist": "vite build && electron-builder --win --publish never",
+    "test": "node scripts/test.mjs",
+    "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "@capacitor/browser": "^6.0.0",
