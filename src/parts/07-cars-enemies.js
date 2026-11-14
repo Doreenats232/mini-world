@@ -13,6 +13,7 @@ mkCar(25, 45, 0, 0xd62828); mkCar(45, 25, Math.PI / 2, 0x2a9d8f); mkCar(-25, -5,
 function toggleCar() {
   if (!inCar && shopNear()) { openShop(); return; }
   if (!inCar && tryUse()) return;
+  if (!inCar && tryTalk()) return;
   if (inCar) { const c = inCar; inCar = null; c.speed = 0; stopEngine(); P.pos.set(c.pos.x + Math.cos(c.h) * 3, 0, c.pos.z - Math.sin(c.h) * 3); P.vel.set(0, 0, 0); P.yaw = c.h + Math.PI; P.pitch = 0; return; }
   let best = null, bd = 5;
   for (const c of cars) { const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; best = c; } }

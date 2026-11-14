@@ -17,7 +17,7 @@ function tracer(to) {
   const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xffee88 })); scene.add(l); setTimeout(() => { scene.remove(l); g.dispose(); }, 70);
 }
 function shoot() {
-  if (cool > 0) return;
+  if (cool > 0) return; scare(P.pos, 28);
   cam.updateMatrixWorld(); const dm = 1 + 0.25 * up.dmg, sg = weapon === 'shotgun';
   cool = sg ? 0.7 : 0.25; sfx('shoot'); if (sg) sfx('punch');
   gun.far = sg ? 30 : 70;

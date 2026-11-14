@@ -15,14 +15,14 @@ if (native) {
 }
 
 // ---------- day / night ----------
-let dayT = 0.3;
+let dayT = 0.3, dayLight = 1;
 const cNight = new THREE.Color(0x070b1f), cDay = new THREE.Color(0x87ceeb), cDusk = new THREE.Color(0xff8a50), cTmp = new THREE.Color();
 function updateSky(dt) {
   dayT = (dayT + dt / 300) % 1;
   const a = dayT * Math.PI * 2, sy = -Math.cos(a);
   const day = Math.min(1, Math.max(0, (sy + 0.15) / 0.4)), dusk = Math.max(0, 1 - Math.abs(sy) / 0.3) * 0.6;
   cTmp.copy(cNight).lerp(cDay, day).lerp(cDusk, dusk);
-  scene.background.copy(cTmp); scene.fog.color.copy(cTmp);
+  dayLight = day; scene.background.copy(cTmp); scene.fog.color.copy(cTmp);
   sun.position.set(Math.sin(a) * 100, sy * 100 + 5, 30); sun.intensity = 0.05 + 1.15 * day;
   hemi.intensity = 0.28 + 0.82 * day;
   for (const k in matCache) matCache[k].emissiveIntensity = (1 - day) * 1.1;

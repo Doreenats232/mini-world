@@ -11,15 +11,15 @@ fs.unlinkSync('scripts/.bundle.mjs');
 const grab = n => { const i = src.indexOf('function ' + n); if (i < 0) throw new Error('missing function ' + n); return src.slice(i, src.indexOf('\n}\n', i) + 3); };
 const grabConst = n => { const i = src.indexOf('const ' + n + ' ='); if (i < 0) throw new Error('missing const ' + n); return src.slice(i, src.indexOf(';\n', i) + 2); };
 const mod = `import * as THREE from 'three'; import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-const V3 = THREE.Vector3; const BLOCKS = [['planks','wood'],['stone','stone'],['brick','stone'],['glass','sand'],['concrete','stone'],['roof','wood']]; const BIDX = Object.fromEntries(BLOCKS.map((b, i) => [b[0], i]));
+const V3 = THREE.Vector3; const CITMAT = new THREE.MeshLambertMaterial({ vertexColors: true }); const BLOCKS = [['planks','wood'],['stone','stone'],['brick','stone'],['glass','sand'],['concrete','stone'],['roof','wood']]; const BIDX = Object.fromEntries(BLOCKS.map((b, i) => [b[0], i]));
 const CT = 0.8, CG = 4, CDW = 2.4, CDH = 3.0; const m0 = () => new THREE.MeshBasicMaterial(); const FACMAT = [m0(), m0(), m0(), m0()], roofTop = m0(), INTWALL = FACMAT, FLOORMAT = FACMAT, CEILMAT = m0(), FRAMEMAT = m0();
 ${src.slice(src.indexOf('const FURN ='), src.indexOf(';\n', src.indexOf('const FURN =')) + 2)}
 const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
-${grab('expandPlan')}${grab('rotCells')}${grab('genPlan')}${grab('buildShell')}
-export { expandPlan, rotCells, genPlan, buildShell, FURN, V3, THREE, BLOCKS };`;
+${grab('expandPlan')}${grab('rotCells')}${grab('genPlan')}${grab('buildShell')}${grab('cbox')}${grab('mkCitizenModel')}${grabConst('nextI')}
+export { expandPlan, rotCells, genPlan, buildShell, FURN, V3, THREE, BLOCKS, mkCitizenModel, nextI };`;
 fs.writeFileSync('scripts/.logic.mjs', mod);
 const L = await import(pathToFileURL(path.resolve('scripts/.logic.mjs')).href); fs.unlinkSync('scripts/.logic.mjs');
-const { expandPlan, rotCells, genPlan, buildShell, FURN, V3, THREE } = L, CT = 0.8;
+const { expandPlan, rotCells, genPlan, buildShell, FURN, V3, THREE, mkCitizenModel, nextI } = L, CT = 0.8;
 ok(expandPlan('garbage').length === 0 && expandPlan([{ op: 'box', w: 99, h: 99, d: 99, block: 'zzz' }]).length === 700, 'expandPlan survives garbage and caps at 700 cells');
 const c1 = expandPlan([{ op: 'box', x: 0, y: 0, z: 0, w: 6, h: 3, d: 6, block: 'brick', hollow: true }, { op: 'furniture', type: 'door', x: 2, y: 0, z: 0, rot: 0 }, { op: 'furniture', type: 'sofa', x: 3, y: 0, z: 3 }]);
 ok(c1.filter(k => k.f).length === 1 && !c1.some(k => k.x === 2 && k.y === 0 && k.z === 0 && k.t !== undefined), 'door replaces wall cell; unknown furniture ignored');
@@ -42,4 +42,8 @@ for (const ry of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
   const dx = b.x + nx * (half - CT / 2), dz = b.z + nz * (half - CT / 2), box = (x, z) => new THREE.Box3(new V3(x - 0.35, 0.1, z - 0.35), new V3(x + 0.35, 1.7, z + 0.35)), hit = bb => boxes.some(q => q.intersectsBox(bb));
   ok(mesh.material.length === 6 && !hit(box(dx, dz)) && hit(box(dx + tx * 2.5, dz + tz * 2.5)) && !hit(box(b.x, b.z)), `building shell ry=${ry.toFixed(2)}: door open, wall solid, room clear, 6 draw calls`);
 }
+{ let bad = '';
+  for (let t = 0; t < 300 && !bad; t++) { const p = (Math.random() - 0.5) * 800, d = Math.random() < 0.5 ? 1 : -1, r = nextI(p, d); if ((((r - 25) % 50) + 50) % 50 !== 0 || (d > 0 ? r <= p : r >= p) || Math.abs(r - p) > 50) bad = `nextI(${p},${d})=${r}`; }
+  ok(!bad, 'citizen road navigation nextI always lands on an intersection ahead ' + bad); }
+for (const o of [{ skin: 1, hair: 2, shirt: 3, pants: 4 }, { skin: 1, hair: 2, shirt: 3, pants: 4, hat: 5, glasses: 1, pack: 6, vest: 7, apron: 1, guitar: 1, bag: 8, tool: 1 }]) { const M = mkCitizenModel(o); let meshes = 0; M.g.traverse(m => { if (m.isMesh) meshes++; }); ok(meshes === 5 && M.aL && M.aR && M.lL && M.lR, `citizen model is 5 draw calls (${Object.keys(o).length} options)`); }
 console.log(fails ? `\n${fails} TEST(S) FAILED` : '\nALL TESTS PASSED'); process.exit(fails ? 1 : 0);

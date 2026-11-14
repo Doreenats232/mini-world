@@ -18,6 +18,7 @@ function drawMini() {
   for (const nd of nodes) if (nd.left > 0) dot(nd.pos.x, nd.pos.z, nd.type === 'wood' ? '#2ecc40' : nd.type === 'stone' ? '#e0e0e0' : '#f1c40f', 4, false);
   for (const e of enemies) if (!e.dead) dot(e.pos.x, e.pos.z, '#ff3b30', 5, false);
   for (const e of cops) if (!e.dead) dot(e.pos.x, e.pos.z, '#3b82f6', 6, false);
+  for (const c of citizens) if (!c.hidden) dot(c.pos.x, c.pos.z, '#e8e8e8', 3, false);
   for (const r of net.remotes.values()) dot(r.pos.x, r.pos.z, '#00e5ff', 6, true);
   dot(SHOP.x, SHOP.z, '#ffd400', 7, true);
   for (const cr of cars) { const [sx, sy, inside] = toS(cr.pos.x, cr.pos.z); if (inside) { mg.fillStyle = '#fff'; mg.fillRect(sx - 4, sy - 4, 8, 8); } }
@@ -37,8 +38,8 @@ let last = performance.now(), spawnT = 0;
 ren.setAnimationLoop(now => {
   const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
   cityT -= dt; if (cityT <= 0) { cityT = 0.3; updateCity(); }
-  updateSky(dt); updateUse(dt);
-  { const pre = isTouch ? 'Tap CAR: ' : 'Press E: '; let ht = ''; if (!inCar && !shopOpen) { if (shopNear()) ht = pre + 'open shop'; else { const u = nearestUse(); if (u) ht = pre + USEN[u.f]; } } if (ht !== hintTxt) { hintTxt = ht; $('hint').textContent = ht; $('hint').style.display = ht ? 'block' : 'none'; } }
+  updateSky(dt); updateUse(dt); updateCitizens(dt);
+  { const pre = isTouch ? 'Tap CAR: ' : 'Press E: '; let ht = ''; if (!inCar && !shopOpen) { if (shopNear()) ht = pre + 'open shop'; else { const u = nearestUse(); if (u) ht = pre + USEN[u.f]; else { const cz = nearestCitizen(); if (cz) ht = pre + 'talk to ' + cz.name + ' (' + cz.job + ')'; } } } if (ht !== hintTxt) { hintTxt = ht; $('hint').textContent = ht; $('hint').style.display = ht ? 'block' : 'none'; } }
   miniT -= dt; if (miniT <= 0) { miniT = 0.066; drawMini(); }
   if (inCar) driveCar(dt); else playerStep(dt);
   if (held && mode === 'fight' && !inCar) shoot();

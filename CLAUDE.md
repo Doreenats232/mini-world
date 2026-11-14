@@ -35,7 +35,8 @@ Repo: Doreenats232/mini-world. Live: https://doreenats232.github.io/mini-world/ 
 | 15-furniture-interiors | `FURN`, `mkFurn`, `addFurniture`, doors, E-to-use fixtures (`useIt`), city interiors `spawnInterior/updateCity` |
 | 16-police-shop | wanted level + cops, shop `ITEMS` |
 | 17-multiplayer | PeerJS host/join, avatars, world sync, NPC puppets |
-| 18-minimap-loop | minimap, main `setAnimationLoop` (order of per-frame updates) |
+| 18-citizens | ambient townspeople: pool of ~26 (14 on phone) with 10 jobs (walker, shopper, jogger, worker, vendor, chatter, sitter, kid, dogwalker, busker), road navigation `nextI`, flee from gunfire/thugs/fast cars, E to talk, day/night weights |
+| 19-minimap-loop | minimap, main `setAnimationLoop` (order of per-frame updates) |
 
 ## Gotchas (learned the hard way)
 - Top-level `const/let` used during module start-up must be defined ABOVE the first call (TDZ). `net` lives in 00-header for this reason. Function declarations are hoisted, so they can sit anywhere.
