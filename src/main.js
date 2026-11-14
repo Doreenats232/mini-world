@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import Peer from 'peerjs';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const VER = __V__;
 const REPO = 'Doreenats232/mini-world';
@@ -57,6 +58,17 @@ const roadTex = mkTex(128, 256, (g, w, h) => {
   g.fillStyle = '#555'; g.fillRect(0, 0, 2, h); g.fillRect(w - 2, 0, 2, h);
 });
 roadTex.repeat.set(1, 800 / 28);
+const FACMAT = FACADES.map(t => new THREE.MeshLambertMaterial({ map: t, emissive: 0xffffff, emissiveMap: t._em, emissiveIntensity: 0 }));
+const lamM = map => new THREE.MeshLambertMaterial({ map, emissive: 0xffc980, emissiveIntensity: 0 });
+const wallTex = c => mkTex(64, 64, (g, w, h) => { g.fillStyle = c; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(0,0,0,.05)'; for (let x = 0; x < w; x += 8) g.fillRect(x, 0, 2, h); speck(g, w, h, 200, 'rgba(255,255,255,.1)', 'rgba(0,0,0,.06)'); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(0, h - 5, w, 5); });
+const INTWALL = ['#e8dcc8', '#cfe0e8', '#e8cfd4', '#d9e8cf'].map(c => lamM(wallTex(c)));
+const FLOORMAT = [
+  mkTex(64, 64, (g, w, h) => { for (let r = 0; r < 4; r++) { g.fillStyle = `hsl(30,${rr(35, 45)}%,${rr(38, 50)}%)`; g.fillRect(0, r * 16, w, 16); g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(0, r * 16, w, 1); g.fillRect((r % 2) * 32 + 20, r * 16, 1, 16); } }),
+  mkTex(64, 64, (g, w, h) => { g.fillStyle = '#d3d6d9'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 1; g.strokeRect(0.5, 0.5, 31, 31); g.strokeRect(32.5, 32.5, 31, 31); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(33, 1, 30, 30); g.fillRect(1, 33, 30, 30); }),
+].map(lamM);
+const CEILMAT = lamM(mkTex(32, 32, (g, w, h) => { g.fillStyle = '#f2f2f2'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(0,0,0,.08)'; g.strokeRect(0, 0, w, h); }));
+const FRAMEMAT = new THREE.MeshLambertMaterial({ color: 0x4a3320 });
+const nightMats = [...INTWALL, ...FLOORMAT, CEILMAT];
 const BLOCKS = [['planks', 'wood'], ['stone', 'stone'], ['brick', 'stone'], ['glass', 'sand'], ['concrete', 'stone'], ['roof', 'wood']];
 const BIDX = Object.fromEntries(BLOCKS.map((b, i) => [b[0], i]));
 const BTEX = [
@@ -74,7 +86,7 @@ const bmats = BTEX.map((t, i) => new THREE.MeshLambertMaterial(i === 3 ? { map: 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 scene.fog = new THREE.Fog(0x87ceeb, 60, 260);
-const cam = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 600);
+const cam = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 320);
 cam.rotation.order = 'YXZ';
 const ren = new THREE.WebGLRenderer({ antialias: !isTouch });
 ren.setSize(innerWidth, innerHeight);
@@ -99,14 +111,50 @@ for (let k = -8; k <= 7; k++) {
   const a = new THREE.Mesh(new THREE.PlaneGeometry(14, 800), roadMat); a.rotation.x = -Math.PI / 2; a.position.set(k * 50 + 25, 0.03, 0); scene.add(a);
   const gr = new THREE.Group(), b = new THREE.Mesh(new THREE.PlaneGeometry(14, 800), roadMat); b.rotation.x = -Math.PI / 2; gr.add(b); gr.rotation.y = Math.PI / 2; gr.position.set(0, 0.035, k * 50 + 25); scene.add(gr);
 }
+// ---- enterable city: hollow shells with a door, merged into one mesh per building ----
+const buildings = [], cityFoot = [];
+const CT = 0.8, CG = 4, CDW = 2.4, CDH = 3.0;
+function buildShell(b) {
+  const cx = b.x, cz = b.z, w = b.w, d = b.d, h = b.h, PI = Math.PI;
+  const L = { fac: [], roof: [], wall: [], floor: [], ceil: [], frame: [] }, boxes = [];
+  const quad = (list, qw, qh, px, py, pz, ry, ru, rv) => { const g = new THREE.PlaneGeometry(qw, qh), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * ru, uv.getY(i) * rv); g.rotateY(ry); g.translate(px, py, pz); list.push(g); };
+  const flat = (list, fw, fd, y, rx, ru, rv) => { const g = new THREE.PlaneGeometry(fw, fd), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * ru, uv.getY(i) * rv); g.rotateX(rx); g.translate(cx, y, cz); list.push(g); };
+  for (const ry of [0, PI / 2, PI, -PI / 2]) {
+    const nx = Math.round(Math.sin(ry)), nz = Math.round(Math.cos(ry)), tx = Math.round(Math.cos(ry)), tz = -Math.round(Math.sin(ry));
+    const ew = ry === 0 || ry === PI, Lw = ew ? w : d, half = ew ? d / 2 : w / 2, isDoor = ry === b.ry;
+    const pieces = isDoor ? [[-Lw / 2, -CDW / 2, 0, h], [CDW / 2, Lw / 2, 0, h], [-CDW / 2, CDW / 2, CDH, h]] : [[-Lw / 2, Lw / 2, 0, h]];
+    for (const [u0, u1, y0, y1] of pieces) {
+      const uc = (u0 + u1) / 2, len = u1 - u0;
+      quad(L.fac, len, y1 - y0, cx + nx * half + tx * uc, (y0 + y1) / 2, cz + nz * half + tz * uc, ry, Math.max(1, Math.round(len / 8)), Math.max(1, Math.round((y1 - y0) / 8)));
+      const iy1 = Math.min(y1, CG);
+      if (iy1 > y0) quad(L.wall, len, iy1 - y0, cx + nx * (half - CT) + tx * uc, (y0 + iy1) / 2, cz + nz * (half - CT) + tz * uc, ry + PI, Math.max(1, Math.round(len / 3)), Math.max(1, Math.round((iy1 - y0) / 3)));
+      const ax = cx + nx * half + tx * u0, az = cz + nz * half + tz * u0, bx2 = cx + nx * (half - CT) + tx * u1, bz2 = cz + nz * (half - CT) + tz * u1;
+      boxes.push(new THREE.Box3(new V3(Math.min(ax, bx2), y0, Math.min(az, bz2)), new V3(Math.max(ax, bx2), y1, Math.max(az, bz2))));
+    }
+    if (isDoor) {
+      const fr = (fw, fh, fd, u, y) => { const g = new THREE.BoxGeometry(fw, fh, fd); g.rotateY(ry); g.translate(cx + nx * (half - CT / 2) + tx * u, y, cz + nz * (half - CT / 2) + tz * u); L.frame.push(g); };
+      fr(0.2, CDH, CT + 0.06, -CDW / 2 - 0.1, CDH / 2); fr(0.2, CDH, CT + 0.06, CDW / 2 + 0.1, CDH / 2); fr(CDW + 0.4, 0.2, CT + 0.06, 0, CDH + 0.1);
+    }
+  }
+  flat(L.roof, w, d, h + 0.02, -PI / 2, w / 4, d / 4); flat(L.floor, w - 2 * CT, d - 2 * CT, 0.03, -PI / 2, w / 2, d / 2); flat(L.ceil, w - 2 * CT, d - 2 * CT, CG, PI / 2, w / 4, d / 4);
+  boxes.push(new THREE.Box3(new V3(cx - w / 2, h - 0.5, cz - d / 2), new V3(cx + w / 2, h, cz + d / 2)));
+  const geos = [], mats = [], add = (list, mat) => { if (list.length) { geos.push(list.length === 1 ? list[0] : mergeGeometries(list, false)); mats.push(mat); } };
+  add(L.fac, FACMAT[b.v]); add(L.roof, roofTop); add(L.wall, INTWALL[b.iv]); add(L.floor, FLOORMAT[b.fv]); add(L.ceil, CEILMAT); add(L.frame, FRAMEMAT);
+  return { mesh: new THREE.Mesh(mergeGeometries(geos, true), mats), boxes };
+}
 for (let i = -7; i <= 6; i++) for (let j = -7; j <= 6; j++) {
-  const n = 1 + Math.floor(rnd() * 3);
+  const n = 1 + Math.floor(rnd() * 3), placed = [];
   for (let q = 0; q < n; q++) {
     const w = 8 + rnd() * 10, d = 8 + rnd() * 10, h = 6 + rnd() * rnd() * 46, v = Math.floor(rnd() * 4);
     const x = i * 50 + (rnd() - 0.5) * 18, z = j * 50 + (rnd() - 0.5) * 18;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [sideMat(v, d, h), sideMat(v, d, h), roofTop, roofTop, sideMat(v, w, h), sideMat(v, w, h)]);
-    m.position.set(x, h / 2, z); scene.add(m); targets.push(m); m.updateMatrixWorld();
-    solids.set('b' + i + ',' + j + ',' + q, new THREE.Box3().setFromObject(m));
+    if (placed.some(o => Math.abs(o.x - x) < (o.w + w) / 2 + 2 && Math.abs(o.z - z) < (o.d + d) / 2 + 2)) continue;
+    placed.push({ x, z, w, d });
+    const rx = Math.round((x - 25) / 50) * 50 + 25, rz = Math.round((z - 25) / 50) * 50 + 25;
+    const dX = rx > x ? rx - (x + w / 2) : (x - w / 2) - rx, dZ = rz > z ? rz - (z + d / 2) : (z - d / 2) - rz;
+    const id = buildings.length, ry = dX < dZ ? (rx > x ? Math.PI / 2 : -Math.PI / 2) : (rz > z ? 0 : Math.PI);
+    const b = { id, x, z, w, d, h, v, iv: id % 4, fv: (id >> 2) % 2, ry, on: false, int: null };
+    const sh = buildShell(b); scene.add(sh.mesh); targets.push(sh.mesh); b.boxes = sh.boxes; buildings.push(b);
+    cityFoot.push(new THREE.Box3(new V3(x - w / 2, 0, z - d / 2), new V3(x + w / 2, h, z + d / 2)));
   }
 }
 const onRoad = (x, z, m = 8.5) => { const a = ((x - 25) % 50 + 50) % 50, b = ((z - 25) % 50 + 50) % 50; return a < m || a > 50 - m || b < m || b > 50 - m; };
@@ -165,6 +213,10 @@ function sfx(n, v = 1) {
     case 'mine': tone(1200, 700, 0.04, 'square', 0.12 * v); noise(0.05, 0.3 * v, 2500, 'highpass'); break;
     case 'crash': noise(0.25, 0.6 * v, 600); tone(100, 40, 0.25, 'sawtooth', 0.3 * v); break;
     case 'siren': tone(600, 900, 0.35, 'sine', 0.2 * v); setTimeout(() => tone(900, 600, 0.35, 'sine', 0.2 * v), 350); break;
+    case 'water': noise(0.22, 0.1 * v, 3500, 'highpass'); break;
+    case 'flush': noise(1.1, 0.3 * v, 900); tone(150, 60, 1, 'sine', 0.1 * v); break;
+    case 'click': tone(1300, 900, 0.04, 'square', 0.1 * v); break;
+    case 'sizzle': noise(0.7, 0.15 * v, 5000, 'highpass'); break;
     case 'step': noise(0.04, 0.1 * v, 450); break;
   }
 }
@@ -257,6 +309,7 @@ function mkCar(x, z, h, col, owned = false) {
 mkCar(25, 45, 0, 0xd62828); mkCar(45, 25, Math.PI / 2, 0x2a9d8f); mkCar(-25, -5, 0, 0xf4a261); mkCar(75, -25, Math.PI / 2, 0x6a4c93);
 function toggleCar() {
   if (!inCar && shopNear()) { openShop(); return; }
+  if (!inCar && tryUse()) return;
   if (inCar) { const c = inCar; inCar = null; c.speed = 0; stopEngine(); P.pos.set(c.pos.x + Math.cos(c.h) * 3, 0, c.pos.z - Math.sin(c.h) * 3); P.vel.set(0, 0, 0); P.yaw = c.h + Math.PI; P.pitch = 0; return; }
   let best = null, bd = 5;
   for (const c of cars) { const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; best = c; } }
@@ -342,7 +395,7 @@ function mkNode(type, x, z) {
 function nodeSpotOk(x, z) {
   if (onRoad(x, z, 9)) return false;
   const e = { pos: new V3(x, 0, z), R: 3, H: 6 };
-  for (const b of solids.values()) if (hit(e, b)) return false;
+  for (const b of cityFoot) if (hit(e, b)) return false;
   for (const n of nodes) if (Math.hypot(n.pos.x - x, n.pos.z - z) < 7) return false;
   return true;
 }
@@ -356,33 +409,50 @@ function nearestNode(pos, type) { let b = null, bd = 1e9; for (const n of nodes)
 
 // ---------- NPCs ----------
 const npcs = [], structures = [], reserved = [];
+const hmc = {}, HMt = c => hmc[c] || (hmc[c] = new THREE.MeshLambertMaterial({ color: c }));
+function faceTex(skin) {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = skin; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = '#fff'; g.fillRect(12, 26, 15, 10); g.fillRect(37, 26, 15, 10); g.fillStyle = '#4a3322'; g.fillRect(18, 27, 8, 9); g.fillRect(43, 27, 8, 9); g.fillStyle = '#0b0b0b'; g.fillRect(20, 29, 4, 6); g.fillRect(45, 29, 4, 6);
+  g.fillStyle = 'rgba(40,25,10,.85)'; g.fillRect(10, 19, 18, 4); g.fillRect(36, 19, 18, 4);
+  g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(29, 37, 6, 9); g.fillStyle = '#9c3f36'; g.fillRect(24, 50, 16, 4); g.fillStyle = '#c4665c'; g.fillRect(26, 51, 12, 1);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter; return t;
+}
+function mkHuman(o) {
+  const g = new THREE.Group(), hexs = n => '#' + n.toString(16).padStart(6, '0');
+  const skin = HMt(o.skin), shirt = HMt(o.shirt), pants = HMt(o.pants), hair = HMt(o.hair);
+  const part = (w, h, d, x, y, z, m, parent = g) => { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.position.set(x, y, z); parent.add(me); return me; };
+  part(0.64, 0.7, 0.34, 0, 1.15, 0, shirt); part(0.6, 0.26, 0.32, 0, 0.74, 0, pants); part(0.15, 0.12, 0.15, 0, 1.56, 0, skin);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.4, 0.38), [skin, skin, skin, skin, new THREE.MeshLambertMaterial({ map: faceTex(hexs(o.skin)) }), skin]); head.position.set(0, 1.84, 0); g.add(head);
+  part(0.42, 0.12, 0.42, 0, 2.06, 0, hair); part(0.42, 0.32, 0.1, 0, 1.92, -0.17, hair); part(0.06, 0.22, 0.34, -0.2, 1.95, 0, hair); part(0.06, 0.22, 0.34, 0.2, 1.95, 0, hair); part(0.07, 0.1, 0.07, 0, 1.8, 0.2, skin);
+  const arm = sx => { const p = new THREE.Group(); p.position.set(sx * 0.42, 1.44, 0); part(0.2, 0.36, 0.2, 0, -0.18, 0, shirt, p); part(0.16, 0.3, 0.16, 0, -0.5, 0, skin, p); part(0.15, 0.13, 0.15, 0, -0.72, 0, skin, p); g.add(p); return p; };
+  const leg = sx => { const p = new THREE.Group(); p.position.set(sx * 0.16, 0.72, 0); part(0.24, 0.72, 0.26, 0, -0.36, 0, pants, p); part(0.26, 0.12, 0.36, 0, -0.66, 0.05, HMt(0x222222), p); g.add(p); return p; };
+  const aL = arm(-1), aR = arm(1), lL = leg(-1), lR = leg(1), dark = HMt(0x222222);
+  if (o.role === 'architect') { part(0.14, 0.1, 0.02, -0.1, 1.86, 0.2, dark); part(0.14, 0.1, 0.02, 0.1, 1.86, 0.2, dark); part(0.08, 0.02, 0.02, 0, 1.88, 0.2, dark); part(0.52, 0.08, 0.52, 0.02, 2.14, 0, HMt(0x1b4f8a)); part(0.12, 0.08, 0.12, 0.05, 2.2, 0, HMt(0x1b4f8a)); part(0.12, 0.34, 0.03, 0, 1.2, 0.19, HMt(0x1b4f8a)); }
+  if (o.role === 'builder') { part(0.5, 0.14, 0.5, 0, 2.14, 0, HMt(0xf1c40f)); part(0.5, 0.04, 0.2, 0, 2.08, 0.28, HMt(0xf1c40f)); part(0.3, 0.14, 0.08, 0, 1.68, 0.18, hair); part(0.68, 0.1, 0.36, 0, 0.9, 0, HMt(0x6b4423)); part(0.12, 0.2, 0.1, 0.36, 0.78, 0, HMt(0x888888)); }
+  if (o.role === 'guard') { part(0.46, 0.14, 0.46, 0, 2.12, 0, HMt(0x1e5631)); part(0.46, 0.03, 0.18, 0, 2.07, 0.28, HMt(0x14391f)); part(0.68, 0.5, 0.38, 0, 1.2, 0, HMt(0x2f6b3d)); part(0.1, 0.1, 0.02, 0.18, 1.3, 0.2, HMt(0xffd400)); part(0.68, 0.08, 0.38, 0, 0.92, 0, dark); }
+  return { g, aL, aR, lL, lR };
+}
 const NPCDEF = [
-  { id: 'archie', name: 'Archie', role: 'architect', pers: 'thoughtful, loves clean elegant design, a little pedantic, polite', col: 0x2e86de, x: 31, z: 25 },
-  { id: 'mason', name: 'Mason', role: 'builder', pers: 'blunt hard worker, hates wasting materials, dry humor', col: 0xe67e22, x: 19, z: 27 },
-  { id: 'ranger', name: 'Ranger', role: 'guard', pers: 'brave and protective, jokes when in danger, suspicious of strangers', col: 0x27ae60, x: 25, z: 17 },
+  { id: 'archie', name: 'Archie', role: 'architect', pers: 'thoughtful, loves clean elegant design, a little pedantic, polite', col: 0x2e86de, skin: 0xf1c8a5, shirt: 0x4a90d9, pants: 0x2c3e50, hair: 0x3b2a1e, x: 31, z: 25 },
+  { id: 'mason', name: 'Mason', role: 'builder', pers: 'blunt hard worker, hates wasting materials, dry humor', col: 0xe67e22, skin: 0xc68e5e, shirt: 0xe67e22, pants: 0x34495e, hair: 0x2a1a0e, x: 19, z: 27 },
+  { id: 'ranger', name: 'Ranger', role: 'guard', pers: 'brave and protective, jokes when in danger, suspicious of strangers', col: 0x27ae60, skin: 0x8d5a3b, shirt: 0x4b6b3a, pants: 0x3a3a2a, hair: 0x111111, x: 25, z: 17 },
 ];
 function mkNpc(d) {
-  const g = new THREE.Group(), cm = new THREE.MeshLambertMaterial({ color: d.col }), skin = new THREE.MeshLambertMaterial({ color: 0xe0b48f });
-  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.4), new THREE.MeshLambertMaterial({ color: 0x2c3e50 })); legs.position.y = 0.35;
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.5), cm); torso.position.y = 1.1;
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), skin); head.position.y = 1.75;
-  const hat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.15, 0.5), new THREE.MeshLambertMaterial({ color: d.role === 'guard' ? 0x1e5631 : d.role === 'architect' ? 0x1b4f8a : 0xb35a14 })); hat.position.y = 2.05;
-  const mkArm = sx => { const p = new THREE.Group(); p.position.set(sx * 0.55, 1.45, 0); const a = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.7, 0.22), cm); a.position.y = -0.3; p.add(a); return p; };
-  const aL = mkArm(-1), aR = mkArm(1);
-  g.add(legs, torso, head, hat, aL, aR); g.position.set(d.x, 0, d.z); scene.add(g);
+  const H = mkHuman(d), g = H.g, aL = H.aL, aR = H.aR, lL = H.lL, lR = H.lR; g.position.set(d.x, 0, d.z); scene.add(g);
   const el = document.createElement('div'); el.className = 'nl';
   const bub = document.createElement('div'); bub.className = 'bub'; const nm = document.createElement('div'); const st = document.createElement('div'); st.className = 'st';
   nm.innerHTML = '<b></b> <small></small>'; nm.firstChild.textContent = d.name; nm.lastChild.textContent = '(' + d.role + ')';
   el.append(bub, nm, st); $('labels').appendChild(el);
-  npcs.push({ ...mkEnt(d.x, 0, d.z, 0.4, 1.9), ...d, mesh: g, aL, aR, el, bub, st, hp: 80, inv: { wood: 0, stone: 0, sand: 0 }, task: null, sub: null, queue: [], status: 'standing by', last: 'just arrived', stuck: 0, work: 0, cd: 0, bubT: 0, idleT: 0, swing: 0, face: 0, home: { x: d.x, z: d.z }, walking: false, working: false });
+  npcs.push({ ...mkEnt(d.x, 0, d.z, 0.4, 1.9), ...d, mesh: g, aL, aR, lL, lR, el, bub, st, hp: 80, inv: { wood: 0, stone: 0, sand: 0 }, task: null, sub: null, queue: [], status: 'standing by', last: 'just arrived', stuck: 0, work: 0, cd: 0, bubT: 0, idleT: 0, swing: 0, face: 0, home: { x: d.x, z: d.z }, walking: false, working: false });
 }
 NPCDEF.forEach(mkNpc);
 const nearestNpc = pos => { let b = null, bd = 1e9; for (const n of npcs) { const d = dist2(n.pos, pos); if (d < bd) { bd = d; b = n; } } return b; };
 const COSTRES = i => BLOCKS[i][1];
-function logLine(txt, cls) { if (net.on && net.host && cls !== 'me') nsend({ t: 'log', txt, cls }); const d = document.createElement('div'); d.textContent = txt; if (cls) d.className = cls; const L = $('log'); L.appendChild(d); while (L.children.length > 8) L.firstChild.remove(); setTimeout(() => d.remove(), 40000); }
+function logLine(txt, cls) { if (net.on && net.host && cls !== 'me') nsend({ t: 'log', txt, cls }); const d = document.createElement('div'); d.textContent = txt; if (cls) d.className = cls; const L = $('log'); L.appendChild(d); while (L.children.length > 10) L.firstChild.remove(); setTimeout(() => d.remove(), 90000); }
 let events = [];
 const ev = t => { events.push(t); logLine('· ' + t, 'ev'); };
-function say(n, t) { t = String(t || '').slice(0, 220); if (!t) return; if (net.on && net.host) nsend({ t: 'say', id: n.id, text: t }); n.bub.textContent = t; n.bubT = 6 + t.length / 18; logLine(n.name + ': ' + t); }
+function say(n, t) { t = String(t || '').slice(0, 220); if (!t) return; if (net.on && net.host) nsend({ t: 'say', id: n.id, text: t }); n.bub.textContent = t; n.bubT = 8 + t.length / 12; logLine(n.name + ': ' + t); }
 function npcHurt(n, d) { n.hp -= d; if (n.hp <= 0) { dropTask(n); n.hp = 80; n.pos.set(n.home.x, 0, n.home.z); n.task = null; n.sub = null; n.last = 'was knocked out and woke up at home'; ev(n.name + ' was knocked out by thugs and woke up at home'); } }
 
 // ---- plan expansion (architecture DSL) ----
@@ -423,6 +493,7 @@ const FACE = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 function siteFree(x0, z0, S) {
   const box = new THREE.Box3(new V3(x0 * 2 - 2, 0.1, z0 * 2 - 2), new V3((x0 + S) * 2 + 2, 60, (z0 + S) * 2 + 2));
   for (const b of solids.values()) if (box.intersectsBox(b)) return false;
+  for (const b of cityFoot) if (box.intersectsBox(b)) return false;
   for (const r of reserved) if (box.intersectsBox(r)) return false;
   for (let x = box.min.x; x <= box.max.x; x += 4) for (let z = box.min.z; z <= box.max.z; z += 4) if (onRoad(x, z, 8)) return false;
   for (const n of nodes) if (n.pos.x > box.min.x - 2 && n.pos.x < box.max.x + 2 && n.pos.z > box.min.z - 2 && n.pos.z < box.max.z + 2) return false;
@@ -508,10 +579,10 @@ function genPlan(kind) {
     F('lamp', 0, 0); F('lamp', 4, 0); F('lamp', 0, 4); F('lamp', 4, 4); F('plant', 2, 0); F('plant', 2, 4); F('plant', 0, 2); F('plant', 4, 2); return ops;
   }
   if (kind === 'house' || kind === 'cottage') {
-    const c = kind === 'cottage', w = c ? 5 : rint(5, 7), d = c ? 5 : rint(5, 7), h = c ? 2 : rint(2, 3), dx = Math.floor(w / 2);
+    const c = kind === 'cottage', w = c ? 5 : rint(6, 7), d = c ? 5 : rint(5, 7), h = c ? 2 : rint(2, 3), dx = Math.floor(w / 2);
     ops.push({ op: 'box', x: 0, y: 0, z: 0, w, h, d, block: wall, hollow: true }); G(1, 1, 0); G(w - 2, 1, 0); G(0, 1, Math.floor(d / 2)); G(w - 1, 1, Math.floor(d / 2));
     F('door', dx, 0); ops.push({ op: 'roof', x: 0, y: h, z: 0, w, d, block: roofB, style: 'gable' });
-    F('bed', w - 2, d - 2); F('shelf', w - 2, d - 3); F('lamp', w - 2, 1); F('table', 1, d - 2); F('chair', 1, d - 3, 1); F('rug', dx, Math.floor(d / 2)); F('plant', 1, 1); return ops;
+    F('bed', w - 2, d - 2); F('shelf', w - 2, d - 3); F('lamp', w - 2, 1); F('table', 1, d - 2); F('chair', 1, d - 3, 1); F('rug', dx, Math.floor(d / 2)); if (c) F('plant', 1, 1); else { F('fridge', 1, 1); F('stove', 2, 1); F('sink', 3, 1); } return ops;
   }
   if (kind === 'shop') {
     const w = rint(7, 9), d = rint(5, 6), h = 3, dx = Math.floor(w / 2);
@@ -523,7 +594,7 @@ function genPlan(kind) {
     const w = 9, d = 7, h = 3, dx = 4;
     ops.push({ op: 'box', x: 0, y: 0, z: 0, w, h, d, block: wall === 'stone' ? 'brick' : wall, hollow: true }, { op: 'fill', x: 1, y: 1, z: 0, w: 2, h: 1, d: 1, block: 'glass' }, { op: 'fill', x: w - 3, y: 1, z: 0, w: 2, h: 1, d: 1, block: 'glass' });
     F('door', dx, 0); ops.push({ op: 'roof', x: 0, y: h, z: 0, w, d, block: roofB, style: 'gable' });
-    for (const x of [1, 3, 5, 7]) F('bed', x, d - 2); F('table', 2, 2); F('chair', 1, 2, 1); F('chair', 3, 2, 3); F('table', 6, 2); F('chair', 5, 2, 1); F('chair', 7, 2, 3); F('shelf', w - 2, 3); F('lamp', 4, 1); F('plant', 1, 1); return ops;
+    for (const x of [1, 3, 5, 7]) F('bed', x, d - 2); F('table', 2, 2); F('chair', 1, 2, 1); F('chair', 3, 2, 3); F('table', 6, 2); F('chair', 5, 2, 1); F('chair', 7, 2, 3); F('shelf', w - 2, 3); F('lamp', 4, 1); F('plant', 1, 1); F('sink', 7, 1); F('toilet', 6, 1); F('tub', 5, 1); return ops;
   }
   // tower
   ops.push({ op: 'box', x: 0, y: 0, z: 0, w: 4, h: 6, d: 4, block: 'stone', hollow: true }); G(2, 2, 0); G(2, 4, 0); G(0, 2, 2); G(0, 4, 2); G(3, 2, 1); G(3, 4, 1);
@@ -622,7 +693,7 @@ function npcVisuals(n, dt) {
   let dr = n.face - n.mesh.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); n.mesh.rotation.y += dr * Math.min(1, dt * 10);
   n.swing = Math.max(0, n.swing - dt);
   const w = n.walking ? Math.sin(clock * 9) * 0.8 : 0;
-  n.aL.rotation.x = w; n.aR.rotation.x = n.swing > 0 ? -1.6 + Math.sin(clock * 40) * 0.5 : n.working ? -1.1 + Math.sin(clock * 14) * 0.6 : -w;
+  n.lL.rotation.x = -w; n.lR.rotation.x = w; n.aL.rotation.x = w; n.aR.rotation.x = n.swing > 0 ? -1.6 + Math.sin(clock * 40) * 0.5 : n.working ? -1.1 + Math.sin(clock * 14) * 0.6 : -w;
   n.bubT -= dt; n.bub.style.display = n.bubT > 0 ? 'block' : 'none';
   if (n._st !== n.status) { n._st = n.status; n.st.textContent = n.status; }
   const v = new V3(n.pos.x, n.pos.y + 2.5, n.pos.z).project(cam);
@@ -634,16 +705,17 @@ function npcVisuals(n, dt) {
 let REL = { url: 'https://relayapi-c5ah.onrender.com', key: '' };
 try { const s = JSON.parse(localStorage.getItem('mw_relay') || 'null'); if (s) REL = { ...REL, ...s }; } catch (e) {}
 const SYS = `You control 3 NPC characters (archie=architect, mason=builder, ranger=guard) in a 3D voxel sandbox city game. Reply with ONE JSON object only. No markdown, no text outside the JSON.
-WORLD: 1 block = 2m. N=-z, S=+z, E=+x, W=-x. Resources: wood (trees), stone (rocks), sand (sand piles). Blocks and cost (1 material per block): planks=wood, roof=wood, stone=stone, brick=stone, concrete=stone, glass=sand. NPCs must gather materials before building; the game automatically walks them to resource nodes, gathers, and goes back to building. Hostile thugs roam the roads; guards fight them. A human PLAYER chats with you. Listen to player_message, act on reasonable requests, and REFUSE (explain briefly, give no task) if it is unsafe, impossible, pointless, or against your personality. You may ask questions, negotiate, joke, report what you see. Keep "say" under 140 characters, in character. "thought" = your short reasoning (1-2 sentences): what you see, what materials you need vs have, why this design.
+WORLD: 1 block = 2m. N=-z, S=+z, E=+x, W=-x. Resources: wood (trees), stone (rocks), sand (sand piles). Blocks and cost (1 material per block): planks=wood, roof=wood, stone=stone, brick=stone, concrete=stone, glass=sand. NPCs must gather materials before building; the game automatically walks them to resource nodes, gathers, and goes back to building. Hostile thugs roam the roads; guards fight them. A human PLAYER chats with you. Listen to player_message, act on reasonable requests, and REFUSE (explain briefly, give no task) if it is unsafe, impossible, pointless, or against your personality. You may ask questions, negotiate, joke, report what you see. Keep "say" under 140 characters, in character. If player_message is not null, the addressed NPC (to="everyone" means the nearest or most fitting NPC) MUST answer it conversationally in "say" (answer questions, chat naturally, explain what you are doing and why); other NPCs may chip in. "thought" = your short reasoning (1-2 sentences): what you see, what materials you need vs have, why this design.
 REPLY FORMAT: {"npcs":[{"id":"archie","thought":"...","say":"...","task":{...}}]}  Include only NPCs that speak or change task. Omit task to keep the current one.
 TASKS: {"type":"idle"} {"type":"wander"} {"type":"follow"} {"type":"guard"} {"type":"gather","resource":"wood|stone|sand","amount":20} {"type":"build","name":"Cottage","where":"near_player|near_me","dx":0,"dz":0,"plan":[ops]} (dx,dz optional offset in meters from the reference point). {"type":"assist","with":"archie"} joins another NPC's build and splits the blocks with them. {"type":"protect","who":"archie"} guards a teammate and fights thugs near them. Any NPC entry may include "then":[task,...] (max 4) to queue follow-up tasks. {"type":"town","name":"Oakvale","buildings":["house","house","cottage","shop","inn","tower"],"size":"small|medium|large"} founds a WHOLE TOWN: the game finds open land, builds a plaza with a well and lamps, designs each listed building (kinds: house, cottage, shop, inn, tower) in a ring facing the plaza, and shares them out among the builders automatically. Use it when the player asks for a town, village or settlement; afterwards do not change the builders' tasks, just comment on progress, keep the guard protecting, and react to the towns progress in the state.
 TEAMWORK: act as a crew, not as individuals. The architect designs and starts a build; builders ASSIST (blocks and material gathering are shared, so it goes faster); the guard PROTECTS the builders. React to teammates' events. If the player asks for something big (a village, a base), split it into several buildings across NPCs and queue follow-ups.
-PLAN OPS (integer cells; x,z horizontal; y up; y=0 is the ground layer; stay within 24x16x24): {"op":"box","x":0,"y":0,"z":0,"w":6,"h":3,"d":6,"block":"brick","hollow":true} (hollow = walls only); {"op":"fill","x","y","z","w","h","d","block"}; {"op":"roof","x","y","z","w","d","block","style":"gable|flat"} (gable ridge runs along x); {"op":"hole","x","y","z","w","h","d"} deletes cells (doors, windows); {"op":"block","x","y","z","block"}; {"op":"floor","x","y","z","w","d","block"}; {"op":"furniture","type":"bed|table|chair|lamp|shelf|rug|plant|door","x","y","z","rot":0} places ONE furniture piece in one cell (cost: bed 3 wood, table 2 wood, chair 1 wood, shelf 2 wood, rug 1 wood, plant 1 wood, lamp 1 sand, door 2 wood). A real door is {"op":"furniture","type":"door","x":2,"y":0,"z":0,"rot":0}: rot 0 for doors in walls running along x (front/back walls), rot 1 for side walls; it opens by itself when someone walks up. rot 0-3 turns other furniture. Later ops override earlier ones. The wall at z=0 is the FRONT; the game rotates the building so the front faces the player.
+PLAN OPS (integer cells; x,z horizontal; y up; y=0 is the ground layer; stay within 24x16x24): {"op":"box","x":0,"y":0,"z":0,"w":6,"h":3,"d":6,"block":"brick","hollow":true} (hollow = walls only); {"op":"fill","x","y","z","w","h","d","block"}; {"op":"roof","x","y","z","w","d","block","style":"gable|flat"} (gable ridge runs along x); {"op":"hole","x","y","z","w","h","d"} deletes cells (doors, windows); {"op":"block","x","y","z","block"}; {"op":"floor","x","y","z","w","d","block"}; {"op":"furniture","type":"bed|table|chair|lamp|shelf|rug|plant|door|sink|toilet|tub|fridge|stove","x","y","z","rot":0} places ONE furniture piece in one cell (cost: bed 3 wood, table 2 wood, chair 1 wood, shelf 2 wood, rug 1 wood, plant 1 wood, lamp 1 sand, door 2 wood, sink 2 stone, toilet 2 stone, tub 3 stone, fridge 3 stone, stove 3 stone; bathrooms = toilet + sink + tub, kitchens = stove + fridge + sink; the player can press E on lamps, taps, toilets, fridges, stoves and beds). A real door is {"op":"furniture","type":"door","x":2,"y":0,"z":0,"rot":0}: rot 0 for doors in walls running along x (front/back walls), rot 1 for side walls; it opens by itself when someone walks up. rot 0-3 turns other furniture. Later ops override earlier ones. The wall at z=0 is the FRONT; the game rotates the building so the front faces the player.
 ARCHITECTURE RULES: design real buildings with walls, a door (a door furniture piece at ground level in the front wall), windows (glass fill at y=1), a roof covering all walls (roof y = wall height), and a furnished interior (bed, table with chairs, lamp, shelf, rug, plant) inside the walls, never on wall cells, keeping a clear path from the door. Sensible sizes (house about 6x3x6 cells). Nothing floating. Pick materials that match what you have and what resource nodes are near, and say why.
 EXAMPLE house: [{"op":"box","x":0,"y":0,"z":0,"w":6,"h":3,"d":6,"block":"brick","hollow":true},{"op":"furniture","type":"door","x":2,"y":0,"z":0,"rot":0},{"op":"fill","x":1,"y":1,"z":0,"w":1,"h":1,"d":1,"block":"glass"},{"op":"fill","x":4,"y":1,"z":0,"w":1,"h":1,"d":1,"block":"glass"},{"op":"roof","x":0,"y":3,"z":0,"w":6,"d":6,"block":"roof","style":"gable"},{"op":"furniture","type":"bed","x":4,"y":0,"z":4,"rot":0},{"op":"furniture","type":"table","x":1,"y":0,"z":3,"rot":0},{"op":"furniture","type":"chair","x":1,"y":0,"z":2,"rot":1},{"op":"furniture","type":"lamp","x":1,"y":0,"z":4,"rot":0},{"op":"furniture","type":"shelf","x":3,"y":0,"z":4,"rot":0}]`;
+let aiCtrl = null, aiAborted = false, aiIsChat = false, chatSeq = 0, chatWaiting = 0;
 let aiBusy = false, aiFail = 0, lastAI = performance.now() - 20000, pendingMsg = null;
-const setStat = t => { $('aistat').textContent = t; };
-setStat(REL.key ? 'AI: ready' : 'AI: no key (⚙) · scripted mode');
+const setStat = (t, c) => { const e = $('aistat'); e.textContent = t; e.style.color = c || '#fff'; };
+setStat(REL.key ? 'AI: ready' : 'AI: no key (⚙) · scripted mode', REL.key ? '#fff' : '#ffb347');
 function stateJSON(m) {
   const nn = n => { const o = {}; for (const r of ['wood', 'stone', 'sand']) { const nd = nearestNode(n.pos, r); if (nd) o[r] = { m: Math.round(dist2(nd.pos, n.pos)), dir: dirName(n.pos, nd.pos), left: nd.left }; } return o; };
   return JSON.stringify({
@@ -654,7 +726,7 @@ function stateJSON(m) {
   });
 }
 async function relay(user) {
-  const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 150000);
+  const ctrl = new AbortController(); aiCtrl = ctrl; const to = setTimeout(() => ctrl.abort(), 150000);
   try {
     const r = await fetch(REL.url.replace(/\/$/, '') + '/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + REL.key }, body: JSON.stringify({ model: 'relay', messages: [{ role: 'system', content: SYS }, { role: 'user', content: 'STATE: ' + user + '\nReply with JSON only.' }] }), signal: ctrl.signal });
     const j = await r.json(); if (!r.ok) throw new Error((j.error && j.error.message) || r.status);
@@ -663,6 +735,7 @@ async function relay(user) {
 }
 function parseAI(t) { const a = t.indexOf('{'), b = t.lastIndexOf('}'); if (a < 0 || b <= a) return null; try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { return null; } }
 function applyAI(j) {
+  chatWaiting = 0; for (const x of npcs) if (x.bub.textContent === '💭 …') x.bubT = 0;
   const arr = Array.isArray(j.npcs) ? j.npcs : j.npc ? [j.npc] : [];
   for (const o of arr) {
     const n = npcs.find(x => x.id === String(o.id || o.name || '').toLowerCase());
@@ -674,18 +747,27 @@ function applyAI(j) {
   }
 }
 async function callAI(m) {
-  aiBusy = true; lastAI = performance.now(); setStat('AI: thinking…');
+  aiBusy = true; aiIsChat = !!m; lastAI = performance.now(); setStat('AI: thinking…', '#ffe066');
   try {
-    const j = parseAI(await relay(stateJSON(m)));
-    if (!j) throw new Error('reply was not valid JSON');
-    aiFail = 0; applyAI(j); setStat('AI: online');
-  } catch (e) { aiFail++; setStat('AI: error (' + (e.name === 'AbortError' ? 'timeout' : e.message) + ')'); if (m) fallbackChat(m); }
+    const raw = await relay(stateJSON(m)), j = parseAI(raw);
+    if (!j) {
+      if (m && raw && raw.trim()) { const n = npcs.find(x => x.id === m.to) || nearestNpc(P.pos); chatWaiting = 0; say(n, raw.trim().slice(0, 200)); aiFail = 0; setStat('AI: online (plain-text reply)', '#7CFC7C'); aiBusy = false; return; }
+      throw new Error('reply was not valid JSON');
+    }
+    aiFail = 0; applyAI(j); setStat('AI: online', '#7CFC7C');
+  } catch (e) {
+    if (e.name === 'AbortError' && aiAborted) { aiAborted = false; aiBusy = false; return; }
+    aiFail++; const why = e.name === 'AbortError' ? 'timeout' : e.message;
+    setStat('AI: error (' + why + ')', '#ff7b7b'); logLine('⚠ AI error: ' + why + (/fetch|network|timeout/i.test(why) ? ' (the relay may be asleep on Render, wait a minute, or check ⚙ → Test connection)' : ''), 'ev');
+    if (m) fallbackChat(m);
+  }
   aiBusy = false;
 }
 setInterval(() => {
-  if (!REL.key || aiBusy || net.client) return;
+  if (!REL.key || net.client) return;
+  if (aiBusy) { if (pendingMsg && !aiIsChat && aiCtrl) { aiAborted = true; aiCtrl.abort(); } return; }
   const since = performance.now() - lastAI;
-  if (pendingMsg && since > 2500) { const m = pendingMsg; pendingMsg = null; callAI(m); return; }
+  if (pendingMsg && since > 1200) { const m = pendingMsg; pendingMsg = null; callAI(m); return; }
   if (aiFail >= 3 && since < 60000) return;
   if ((npcs.some(n => !n.task) && since > 25000) || since > 90000 || (events.length > 2 && since > 20000)) callAI(null);
 }, 1000);
@@ -715,6 +797,11 @@ function fallbackChat(m) {
   else if (/wood|tree/.test(t)) go({ type: 'gather', resource: 'wood', amount: 20 }, 'Chopping wood.');
   else if (/stone|rock/.test(t)) go({ type: 'gather', resource: 'stone', amount: 20 }, 'Gathering stone.');
   else if (/sand|glass/.test(t)) go({ type: 'gather', resource: 'sand', amount: 20 }, 'Fetching sand.');
+  else if (/\b(hi|hello|hey|yo|sup)\b/.test(t)) reply = ['Hey there!', 'Hello! Need anything built?', 'Hi! Ready when you are.'][Math.floor(Math.random() * 3)];
+  else if (/what.*(doing|up to)|status|how.*going/.test(t)) reply = "I'm " + n.status + '.';
+  else if (/who are you|your name/.test(t)) reply = `I'm ${n.name}, the ${n.role}.`;
+  else if (/thank/.test(t)) reply = 'Anytime!';
+  else if (/help|what can you/.test(t)) reply = 'Try: follow me, guard me, build a house, build a town, get wood/stone/sand, stop.';
   else reply = REL.key ? 'My head is fuzzy, try again in a moment.' : 'Add your relay key in settings (⚙) so I can think properly. Until then I can follow, guard, gather or build a hut.';
   say(n, reply);
 }
@@ -725,7 +812,7 @@ function playerSay(text, who = 'You') {
   const mt = text.match(/^@?(archie|mason|ranger)\b[\s,:]*/i), to = mt ? mt[1].toLowerCase() : 'everyone';
   logLine(who + ': ' + text, 'me');
   const m = { to, text: mt ? text.slice(mt[0].length) || text : text };
-  if (!REL.key || aiFail >= 3) fallbackChat(m); else pendingMsg = m;
+  if (!REL.key || aiFail >= 3) fallbackChat(m); else { pendingMsg = m; const tn = npcs.find(x => x.id === m.to) || nearestNpc(P.pos); tn.bub.textContent = '💭 …'; tn.bubT = 40; const id = ++chatSeq; chatWaiting = id; setTimeout(() => { if (chatWaiting === id) { chatWaiting = 0; if (pendingMsg === m) pendingMsg = null; logLine('⏳ The AI is slow right now, answering with my simple brain.', 'ev'); fallbackChat(m); } }, 40000); }
 }
 
 // ---------- actions ----------
@@ -775,11 +862,23 @@ function sendChat() { const v = $('chatin').value; $('chatin').value = ''; close
 $('chatin').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); else if (e.key === 'Escape') closeChat(); });
 $('chatsend').addEventListener('click', sendChat);
 $('gear').addEventListener('click', () => { $('relurl').value = REL.url; $('relkey').value = REL.key; $('panel').style.display = 'block'; document.exitPointerLock && document.exitPointerLock(); });
+$('reltest').addEventListener('click', async () => {
+  const url = $('relurl').value.trim() || REL.url, key = $('relkey').value.trim(), out = $('relres');
+  if (!key) { out.textContent = 'Paste your key first.'; return; }
+  out.textContent = 'Testing… (up to a minute if the server is asleep)'; const t0 = performance.now(), ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 90000);
+  try {
+    const r = await fetch(url.replace(/\/$/, '') + '/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key }, body: JSON.stringify({ model: 'relay', messages: [{ role: 'user', content: 'Reply with only the word OK' }] }), signal: ctrl.signal });
+    const txt = await r.text(); let j = null; try { j = JSON.parse(txt); } catch (e) {}
+    const secs = Math.round((performance.now() - t0) / 1000);
+    out.textContent = r.ok && j && j.choices ? '✅ Works! Reply in ' + secs + 's: ' + String(j.choices[0].message.content).slice(0, 80) : '❌ HTTP ' + r.status + ': ' + (j && j.error ? (j.error.message || JSON.stringify(j.error)) : txt.slice(0, 160));
+  } catch (e) { out.textContent = '❌ ' + (e.name === 'AbortError' ? 'Timed out after 90s (server asleep or provider not responding)' : e.message + ' (usually: wrong URL, server asleep, or CORS blocked)'); }
+  clearTimeout(to);
+});
 $('relclose').addEventListener('click', () => { $('panel').style.display = 'none'; });
 $('relsave').addEventListener('click', () => {
   REL = { url: $('relurl').value.trim() || REL.url, key: $('relkey').value.trim() };
   try { localStorage.setItem('mw_relay', JSON.stringify(REL)); } catch (e) {}
-  aiFail = 0; lastAI = performance.now() - 20000; $('panel').style.display = 'none'; setStat(REL.key ? 'AI: ready' : 'AI: no key (⚙) · scripted mode');
+  aiFail = 0; lastAI = performance.now() - 20000; $('panel').style.display = 'none'; setStat(REL.key ? 'AI: ready' : 'AI: no key (⚙) · scripted mode', REL.key ? '#fff' : '#ffb347');
 });
 
 // ---------- input: desktop ----------
@@ -853,12 +952,13 @@ function updateSky(dt) {
   sun.position.set(Math.sin(a) * 100, sy * 100 + 5, 30); sun.intensity = 0.05 + 1.15 * day;
   hemi.intensity = 0.28 + 0.82 * day;
   for (const k in matCache) matCache[k].emissiveIntensity = (1 - day) * 1.1;
+  for (const m of FACMAT) m.emissiveIntensity = (1 - day) * 1.1; for (const m of nightMats) m.emissiveIntensity = (1 - day) * 0.5;
 }
 setInterval(() => { const h = Math.floor(dayT * 24), m = Math.floor((dayT * 24 - h) * 60); $('ver').textContent = 'v' + VER + ' · ' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }, 1000);
 updateSky(0);
 
 // ---------- furniture + doors ----------
-const FURN = { bed: { res: 'wood', n: 3 }, table: { res: 'wood', n: 2 }, chair: { res: 'wood', n: 1 }, lamp: { res: 'sand', n: 1 }, shelf: { res: 'wood', n: 2 }, rug: { res: 'wood', n: 1 }, plant: { res: 'wood', n: 1 }, door: { res: 'wood', n: 2 } };
+const FURN = { bed: { res: 'wood', n: 3 }, table: { res: 'wood', n: 2 }, chair: { res: 'wood', n: 1 }, lamp: { res: 'sand', n: 1 }, shelf: { res: 'wood', n: 2 }, rug: { res: 'wood', n: 1 }, plant: { res: 'wood', n: 1 }, door: { res: 'wood', n: 2 }, sink: { res: 'stone', n: 2 }, toilet: { res: 'stone', n: 2 }, tub: { res: 'stone', n: 3 }, fridge: { res: 'stone', n: 3 }, stove: { res: 'stone', n: 3 } };
 const fmc = {}, FM = c => fmc[c] || (fmc[c] = new THREE.MeshLambertMaterial({ color: c }));
 function bx(g, w, h, d, x, y, z, col) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), FM(col)); m.position.set(x, y, z); g.add(m); return m; }
 function mkFurn(type, g) {
@@ -867,11 +967,18 @@ function mkFurn(type, g) {
     case 'bed': bx(g, 1.8, 0.45, 1.9, 0, 0.225, 0, 0x6b4423); bx(g, 1.7, 0.22, 1.3, 0, 0.56, 0.3, 0xf2f2f2); bx(g, 1.0, 0.14, 0.4, 0, 0.7, -0.65, 0x4dabf7); bx(g, 1.8, 0.9, 0.12, 0, 0.7, -0.95, 0x6b4423); break;
     case 'table': bx(g, 1.8, 0.12, 1.2, 0, 0.85, 0, 0x9c6b3a); legs(0.8, 0.5, 0.85, 0x7a5230, 0.12); break;
     case 'chair': bx(g, 0.7, 0.1, 0.7, 0, 0.45, 0, 0x9c6b3a); bx(g, 0.7, 0.6, 0.1, 0, 0.8, -0.3, 0x9c6b3a); legs(0.28, 0.28, 0.45, 0x7a5230, 0.08); break;
-    case 'lamp': bx(g, 0.5, 0.08, 0.5, 0, 0.04, 0, 0x333333); bx(g, 0.06, 1.5, 0.06, 0, 0.8, 0, 0x555555); { const sp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe9a0 })); sp.position.y = 1.7; g.add(sp); } break;
+    case 'lamp': bx(g, 0.5, 0.08, 0.5, 0, 0.04, 0, 0x333333); bx(g, 0.06, 1.5, 0.06, 0, 0.8, 0, 0x555555); { const sp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe9a0 })); sp.position.y = 1.7; g.add(sp); g.userData.sph = sp.material; } break;
     case 'shelf': bx(g, 1.8, 1.8, 0.1, 0, 0.9, -0.85, 0x5a3b1f); bx(g, 0.1, 1.8, 0.4, -0.85, 0.9, -0.7, 0x5a3b1f); bx(g, 0.1, 1.8, 0.4, 0.85, 0.9, -0.7, 0x5a3b1f);
       for (const y of [0.05, 0.6, 1.15, 1.75]) bx(g, 1.8, 0.08, 0.4, 0, y, -0.7, 0x8b5a2b);
       for (const y of [0.1, 0.65, 1.2]) for (let i = 0; i < 5; i++) bx(g, 0.18, 0.35 + (i % 2) * 0.1, 0.25, -0.65 + i * 0.32, y + 0.22, -0.7, [0xc0392b, 0x2980b9, 0x27ae60, 0xf1c40f, 0x8e44ad][i]); break;
     case 'rug': bx(g, 1.7, 0.03, 1.7, 0, 0.02, 0, 0xb03a48); bx(g, 1.2, 0.035, 1.2, 0, 0.025, 0, 0xe8c07a); break;
+    case 'sink': bx(g, 1.2, 0.85, 0.6, 0, 0.425, -0.5, 0xe8e8e8); bx(g, 1.2, 0.06, 0.6, 0, 0.88, -0.5, 0xbdbdbd); bx(g, 0.7, 0.04, 0.38, 0, 0.9, -0.48, 0x9ec9e8); bx(g, 0.05, 0.3, 0.05, 0, 1.03, -0.75, 0x9aa0a6); bx(g, 0.05, 0.05, 0.22, 0, 1.18, -0.65, 0x9aa0a6);
+      { const wm = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.26, 6), new THREE.MeshBasicMaterial({ color: 0x6cc6ff, transparent: true, opacity: 0.65 })); wm.position.set(0, 1.03, -0.55); wm.visible = false; g.add(wm); g.userData.water = wm; } break;
+    case 'toilet': bx(g, 0.45, 0.4, 0.55, 0, 0.2, -0.45, 0xf4f4f4); bx(g, 0.5, 0.55, 0.2, 0, 0.65, -0.75, 0xf4f4f4); bx(g, 0.5, 0.05, 0.5, 0, 0.43, -0.42, 0xdcdcdc); break;
+    case 'tub': bx(g, 1.8, 0.55, 0.9, 0, 0.275, -0.45, 0xf4f4f4); bx(g, 1.6, 0.04, 0.7, 0, 0.5, -0.45, 0x7fc8ee); break;
+    case 'fridge': bx(g, 0.9, 1.8, 0.8, 0, 0.9, -0.45, 0xdfe6ea); { const pv = new THREE.Group(); pv.position.set(-0.45, 0.9, -0.03); bx(pv, 0.9, 1.7, 0.06, 0.45, 0, 0, 0xf0f4f6); bx(pv, 0.05, 0.4, 0.06, 0.8, 0.2, 0.05, 0x999999); g.add(pv); g.userData.pivot = pv; } break;
+    case 'stove': bx(g, 1.0, 0.9, 0.7, 0, 0.45, -0.5, 0x4b4f54); bx(g, 0.8, 0.5, 0.04, 0, 0.4, -0.14, 0x8a8f94); g.userData.burn = [];
+      for (const [x, z] of [[-0.25, -0.35], [0.25, -0.35], [-0.25, -0.65], [0.25, -0.65]]) { const bm = new THREE.MeshBasicMaterial({ color: 0x222222 }), c = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.02, 10), bm); c.position.set(x, 0.91, z); g.add(c); g.userData.burn.push(bm); } break;
     case 'plant': { const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.22, 0.4, 10), FM(0xb5651d)); pot.position.y = 0.2; g.add(pot); const lf = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 8), FM(0x2f8f3f)); lf.position.y = 0.85; g.add(lf); } break;
   }
 }
@@ -883,7 +990,7 @@ function addFurniture(cx, cy, cz, type, rot = 0, anim = false, doSave = true) {
   g.position.set(x, y, z); g.rotation.y = -rot * Math.PI / 2; scene.add(g); g.updateMatrixWorld(true);
   const o = { k, cx, cy, cz, f: type, rot, grp: g, pivot, meshes: [] };
   g.traverse(m => { if (m.isMesh) { m.userData.fk = k; targets.push(m); o.meshes.push(m); } });
-  furn.set(k, o);
+  furn.set(k, o); if (USEF.has(type)) regUse(g, type, o);
   if (type === 'door') { const al = rot % 2 === 0, hw = al ? 0.9 : 0.1, hd = al ? 0.1 : 0.9; o.box = new THREE.Box3(new V3(x - hw, y, z - hd), new V3(x + hw, y + 1.95, z + hd)); o.open = 0; o.solid = true; solids.set('d' + k, o.box); doors.push(o); }
   if (anim) { g.scale.setScalar(0.3); grow.push({ m: g, t: 0 }); }
   if (net.on && !net.applying) netSend({ t: 'f+', a: [cx, cy, cz, type, rot] });
@@ -893,7 +1000,7 @@ function addFurniture(cx, cy, cz, type, rot = 0, anim = false, doSave = true) {
 function delFurniture(k) {
   const o = furn.get(k); if (!o) return;
   scene.remove(o.grp); o.meshes.forEach(m => { const i = targets.indexOf(m); if (i >= 0) targets.splice(i, 1); });
-  furn.delete(k); if (o.f === 'door') { doors.splice(doors.indexOf(o), 1); solids.delete('d' + k); } if (net.on && !net.applying) netSend({ t: 'f-', k }); queueSave();
+  furn.delete(k); unregOwner(o); if (o.f === 'door') { doors.splice(doors.indexOf(o), 1); solids.delete('d' + k); } if (net.on && !net.applying) netSend({ t: 'f-', k }); queueSave();
 }
 function updateDoors(dt) {
   for (const d of doors) {
@@ -905,6 +1012,75 @@ function updateDoors(dt) {
   }
 }
 if (pendingFurn) pendingFurn.forEach(a => addFurniture(a[0], a[1], a[2], a[3], a[4], false, false));
+
+// ---------- interactive fixtures (E to use) ----------
+const useables = [], USEF = new Set(['lamp', 'sink', 'toilet', 'fridge', 'stove', 'bed']);
+const USEN = { lamp: 'switch lamp', sink: 'turn tap', toilet: 'flush', fridge: 'open fridge', stove: 'use stove', bed: 'sleep' };
+function regUse(grp, f, owner) { const u = { grp, f, owner, st: 0, t: 0, snd: 0 }; useables.push(u); return u; }
+function unregOwner(o) { for (let i = useables.length - 1; i >= 0; i--) if (useables[i].owner === o) useables.splice(i, 1); }
+function nearestUse() { let b = null, bd = 2.8; for (const u of useables) { const d = Math.hypot(u.grp.position.x - P.pos.x, u.grp.position.z - P.pos.z); if (d < bd && Math.abs(u.grp.position.y - P.pos.y) < 2.5) { bd = d; b = u; } } return b; }
+function useIt(u) {
+  const f = u.f, ud = u.grp.userData;
+  if (f === 'lamp') { u.st = u.st ? 0 : 1; ud.sph.color.setHex(u.st ? 0x555555 : 0xffe9a0); sfx('click'); }
+  else if (f === 'sink') { u.st = u.st ? 0 : 1; ud.water.visible = !!u.st; u.t = 14; sfx('click'); }
+  else if (f === 'toilet') sfx('flush');
+  else if (f === 'fridge') { u.st = u.st ? 0 : 1; sfx('click'); }
+  else if (f === 'stove') { u.st = u.st ? 0 : 1; ud.burn.forEach(m => m.color.setHex(u.st ? 0xff4422 : 0x222222)); sfx('click'); if (u.st) sfx('sizzle'); }
+  else if (f === 'bed') { dayT = 0.27; msg('You slept. Good morning!', 2200); sfx('click'); }
+}
+function tryUse() { const u = nearestUse(); if (!u) return false; useIt(u); return true; }
+function updateUse(dt) {
+  for (const u of useables) {
+    const ud = u.grp.userData;
+    if (u.f === 'sink' && u.st) { u.t -= dt; if (u.t <= 0) { u.st = 0; ud.water.visible = false; } else { u.snd -= dt; if (u.snd <= 0) { u.snd = 0.28; sfxAt(u.grp.position, 'water'); } } }
+    if (u.f === 'fridge') ud.pivot.rotation.y += ((u.st ? -1.6 : 0) - ud.pivot.rotation.y) * Math.min(1, dt * 6);
+  }
+}
+
+// ---------- city interiors (spawn when you get close) ----------
+let cityT = 0;
+function setActive(b, on) { if (b.on === on) return; b.on = on; b.boxes.forEach((bx_, i) => { const k = 'b' + b.id + '_' + i; if (on) solids.set(k, bx_); else solids.delete(k); }); }
+function mkCityDoor(b) {
+  const ry = b.ry, nx = Math.round(Math.sin(ry)), nz = Math.round(Math.cos(ry)), ew = ry === 0 || ry === Math.PI, half = ew ? b.d / 2 : b.w / 2;
+  const wx = b.x + nx * (half - CT / 2), wz = b.z + nz * (half - CT / 2), grp = new THREE.Group(), pivot = new THREE.Group(); pivot.position.set(-CDW / 2, 0, 0);
+  bx(pivot, CDW, CDH - 0.05, 0.14, CDW / 2, (CDH - 0.05) / 2, 0, 0x7a4a24); bx(pivot, 0.12, 0.12, 0.24, CDW - 0.25, 1.4, 0, 0xd4af37);
+  grp.add(pivot); grp.position.set(wx, 0, wz); grp.rotation.y = ry; scene.add(grp);
+  const hw = ew ? CDW / 2 : 0.1, hd = ew ? 0.1 : CDW / 2, box = new THREE.Box3(new V3(wx - hw, 0, wz - hd), new V3(wx + hw, CDH, wz + hd));
+  const o = { k: 'cd' + b.id, cx: (wx - 1) / 2, cy: 0, cz: (wz - 1) / 2, pivot, grp, box, solid: true, open: 0 };
+  solids.set('d' + o.k, box); doors.push(o); return o;
+}
+function spawnInterior(b) {
+  let sd = (b.id * 7919 + 13) % 2147483647 || 1; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const kind = ['home', 'office', 'store', 'cafe'][Math.floor(r() * 4)], groups = [], PI = Math.PI;
+  const put = (type, x, z, rot) => { const g = new THREE.Group(); mkFurn(type, g); g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g); groups.push(g); if (USEF.has(type)) regUse(g, type, b); };
+  const slots = [];
+  for (const sr of [0, PI / 2, PI, -PI / 2]) {
+    const sx = Math.round(Math.sin(sr)), sz = Math.round(Math.cos(sr)), tx = Math.round(Math.cos(sr)), tz = -Math.round(Math.sin(sr));
+    const ew = sr === 0 || sr === PI, Lw = ew ? b.w : b.d, half = ew ? b.d / 2 : b.w / 2;
+    for (let u = -Lw / 2 + 2.9; u <= Lw / 2 - 2.9; u += 2.3) { if (sr === b.ry && Math.abs(u) < 2.6) continue; slots.push({ x: b.x + sx * (half - CT - 0.95) + tx * u, z: b.z + sz * (half - CT - 0.95) + tz * u, rot: sr + PI }); }
+  }
+  for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
+  const WALL = { home: ['bed', 'fridge', 'stove', 'sink', 'shelf', 'toilet', 'tub', 'lamp', 'plant', 'bed'], office: ['shelf', 'shelf', 'plant', 'lamp', 'shelf', 'sink', 'toilet', 'plant'], store: ['shelf', 'shelf', 'shelf', 'shelf', 'fridge', 'plant', 'lamp', 'shelf'], cafe: ['stove', 'fridge', 'sink', 'shelf', 'plant', 'lamp', 'toilet', 'plant'] }[kind];
+  slots.forEach((sl, i) => { if (i < WALL.length) put(WALL[i], sl.x, sl.z, sl.rot); });
+  const set = (x, z) => { put('table', x, z, 0); put('chair', x - 1.3, z, PI / 2); put('chair', x + 1.3, z, -PI / 2); };
+  if (Math.min(b.w, b.d) >= 9) {
+    if (kind === 'home') { put('rug', b.x, b.z, 0); set(b.x, b.z); } else if (kind === 'office') { set(b.x - 2.5, b.z); set(b.x + 2.5, b.z + 1.5); } else if (kind === 'cafe') { set(b.x - 2.2, b.z); set(b.x + 2.2, b.z); } else put('table', b.x, b.z, 0);
+  }
+  b.int = { groups, door: mkCityDoor(b) };
+}
+function despawnInterior(b) {
+  const it = b.int; if (!it) return;
+  for (const g of it.groups) { scene.remove(g); g.traverse(m => { if (m.isMesh) m.geometry.dispose(); }); }
+  unregOwner(b); const d = it.door; solids.delete('d' + d.k); const i = doors.indexOf(d); if (i >= 0) doors.splice(i, 1); scene.remove(d.grp); b.int = null;
+}
+function updateCity() {
+  const pts = [P.pos, ...npcs.map(n => n.pos)];
+  for (const b of buildings) {
+    let dm = 1e9; for (const p of pts) { const dx = Math.max(0, Math.abs(p.x - b.x) - b.w / 2), dz = Math.max(0, Math.abs(p.z - b.z) - b.d / 2); dm = Math.min(dm, Math.hypot(dx, dz)); }
+    setActive(b, dm < (b.on ? 100 : 85));
+    const inter = dm < (b.int ? 48 : 36); if (inter && !b.int) spawnInterior(b); else if (!inter && b.int) despawnInterior(b);
+  }
+}
 
 // ---------- police / wanted ----------
 const cops = [], copRay = new THREE.Raycaster();
@@ -954,7 +1130,7 @@ function copStep(e, dt) {
 
 // ---------- shop ----------
 const SHOP = { x: 36, z: 22 };
-let hintOn = false;
+let hintOn = false, hintTxt = '';
 $('hint').textContent = isTouch ? 'Tap CAR button: open shop' : 'Press E: open shop';
 (function () {
   const g = new THREE.Group(), M = c => new THREE.MeshLambertMaterial({ color: c });
@@ -1030,21 +1206,16 @@ function netApply(m) {
 }
 function hashColor(name) { let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 360; return new THREE.Color().setHSL(h / 360, 0.65, 0.5); }
 function mkAvatar(id, name) {
-  const g = new THREE.Group(), cm = new THREE.MeshLambertMaterial({ color: hashColor(name) }), skin = new THREE.MeshLambertMaterial({ color: 0xe0b48f });
-  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.4), new THREE.MeshLambertMaterial({ color: 0x333344 })); legs.position.y = 0.35;
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.5), cm); torso.position.y = 1.1;
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), skin); head.position.y = 1.75;
-  const mkArm = sx => { const p = new THREE.Group(); p.position.set(sx * 0.55, 1.45, 0); const a = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.7, 0.22), cm); a.position.y = -0.3; p.add(a); return p; };
-  const aL = mkArm(-1), aR = mkArm(1); g.add(legs, torso, head, aL, aR); scene.add(g);
+  const H = mkHuman({ skin: [0xf1c8a5, 0xc68e5e, 0x8d5a3b, 0xe0b48f][name.length % 4], shirt: hashColor(name).getHex(), pants: 0x2d3436, hair: 0x2a1a0e, role: 'player' }), g = H.g; scene.add(g);
   const el = document.createElement('div'); el.className = 'nl'; const bub = document.createElement('div'); bub.className = 'bub'; const nm = document.createElement('div'); nm.innerHTML = '<b style="color:#7fe7ff"></b>'; nm.firstChild.textContent = name; el.append(bub, nm); $('labels').appendChild(el);
-  net.remotes.set(id, { id, name, g, aL, aR, el, bub, pos: new V3(0, -50, 0), tp: new V3(0, -50, 0), yaw: 0, first: true, bubT: 0 });
+  net.remotes.set(id, { id, name, g, aL: H.aL, aR: H.aR, lL: H.lL, lR: H.lR, el, bub, pos: new V3(0, -50, 0), tp: new V3(0, -50, 0), yaw: 0, first: true, bubT: 0 });
 }
 function removeAvatar(id) { const r = net.remotes.get(id); if (!r) return; scene.remove(r.g); r.el.remove(); net.remotes.delete(id); }
 function updateRemotes(dt) {
   for (const r of net.remotes.values()) {
     const b = r.pos.clone(); r.pos.lerp(r.tp, Math.min(1, dt * 12)); const sp = r.pos.distanceTo(b) / Math.max(dt, 0.001);
     r.g.position.copy(r.pos); let dr = r.yaw + Math.PI - r.g.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); r.g.rotation.y += dr * Math.min(1, dt * 10);
-    const w = sp > 0.6 ? Math.sin(clock * 9) * 0.8 : 0; r.aL.rotation.x = w; r.aR.rotation.x = -w;
+    const w = sp > 0.6 ? Math.sin(clock * 9) * 0.8 : 0; r.aL.rotation.x = w; r.aR.rotation.x = -w; r.lL.rotation.x = -w; r.lR.rotation.x = w;
     r.bubT -= dt; r.bub.style.display = r.bubT > 0 ? 'block' : 'none';
     const v = new V3(r.pos.x, r.pos.y + 2.5, r.pos.z).project(cam);
     if (v.z > 1 || v.z < -1 || dist2(r.pos, cam.position) > 120) r.el.style.display = 'none'; else { r.el.style.display = 'block'; r.el.style.transform = `translate(${(v.x * 0.5 + 0.5) * innerWidth}px,${(-v.y * 0.5 + 0.5) * innerHeight}px) translate(-50%,-100%)`; }
@@ -1136,7 +1307,7 @@ function drawMini() {
   mg.translate(c, c); mg.rotate(yaw); mg.scale(sc, sc); mg.translate(-px, -pz);
   mg.fillStyle = '#3a3a3d'; for (let k = -8; k <= 7; k++) { mg.fillRect(k * 50 + 18, -400, 14, 800); mg.fillRect(-400, k * 50 + 18, 800, 14); }
   mg.fillStyle = '#8a8f98';
-  for (const [k, b] of solids) { if (k[0] !== 'b') continue; if (Math.abs((b.min.x + b.max.x) / 2 - px) > lim || Math.abs((b.min.z + b.max.z) / 2 - pz) > lim) continue; mg.fillRect(b.min.x, b.min.z, b.max.x - b.min.x, b.max.z - b.min.z); }
+  for (const b of cityFoot) { if (Math.abs((b.min.x + b.max.x) / 2 - px) > lim || Math.abs((b.min.z + b.max.z) / 2 - pz) > lim) continue; mg.fillRect(b.min.x, b.min.z, b.max.x - b.min.x, b.max.z - b.min.z); }
   mg.fillStyle = '#d4a85f';
   for (const m of blockMeshes.values()) { const x = m.position.x, z = m.position.z; if (Math.abs(x - px) > lim || Math.abs(z - pz) > lim) continue; mg.fillRect(x - 1, z - 1, 2, 2); }
   mg.setTransform(1, 0, 0, 1, 0, 0);
@@ -1159,11 +1330,13 @@ function drawMini() {
 hud();
 for (let i = 0; i < 6; i++) spawnEnemy();
 logLine('Press T (or CHAT) to talk to Archie, Mason and Ranger. ⚙ = set your relay key.', 'ev');
+if (!REL.key) setTimeout(() => logLine('Your NPCs are in scripted mode (no AI key). Tap ⚙, paste your RelayAPI key and press Test connection so they can really talk and think.', 'ev'), 4000);
 let last = performance.now(), spawnT = 0;
 ren.setAnimationLoop(now => {
   const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
-  updateSky(dt);
-  { const nr = !inCar && !shopOpen && shopNear(); if (nr !== hintOn) { hintOn = nr; $('hint').style.display = nr ? 'block' : 'none'; } }
+  cityT -= dt; if (cityT <= 0) { cityT = 0.3; updateCity(); }
+  updateSky(dt); updateUse(dt);
+  { const pre = isTouch ? 'Tap CAR: ' : 'Press E: '; let ht = ''; if (!inCar && !shopOpen) { if (shopNear()) ht = pre + 'open shop'; else { const u = nearestUse(); if (u) ht = pre + USEN[u.f]; } } if (ht !== hintTxt) { hintTxt = ht; $('hint').textContent = ht; $('hint').style.display = ht ? 'block' : 'none'; } }
   miniT -= dt; if (miniT <= 0) { miniT = 0.066; drawMini(); }
   if (inCar) driveCar(dt); else playerStep(dt);
   if (held && mode === 'fight' && !inCar) shoot();
