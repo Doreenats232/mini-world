@@ -53,7 +53,7 @@ for (let i = -7; i <= 6; i++) for (let j = -7; j <= 6; j++) {
     const dX = rx > x ? rx - (x + w / 2) : (x - w / 2) - rx, dZ = rz > z ? rz - (z + d / 2) : (z - d / 2) - rz;
     const id = buildings.length, ry = dX < dZ ? (rx > x ? Math.PI / 2 : -Math.PI / 2) : (rz > z ? 0 : Math.PI);
     const b = { id, x, z, w, d, h, v, iv: id % 4, fv: (id >> 2) % 2, ry, on: false, int: null };
-    const sh = buildShell(b); scene.add(sh.mesh); targets.push(sh.mesh); b.boxes = sh.boxes; buildings.push(b);
+    const sh = buildShell(b); scene.add(sh.mesh); targets.push(sh.mesh); b.boxes = sh.boxes; b.shell = sh.mesh; buildings.push(b);
     cityFoot.push(new THREE.Box3(new V3(x - w / 2, 0, z - d / 2), new V3(x + w / 2, h, z + d / 2)));
   }
 }
@@ -64,7 +64,7 @@ function addCityBuilding(x, z, w, d, h, v) {
   const dX = rx > x ? rx - (x + w / 2) : (x - w / 2) - rx, dZ = rz > z ? rz - (z + d / 2) : (z - d / 2) - rz;
   const id = buildings.length, ry = dX < dZ ? (rx > x ? Math.PI / 2 : -Math.PI / 2) : (rz > z ? 0 : Math.PI);
   const b = { id, x, z, w, d, h, v, iv: id % 4, fv: (id >> 2) % 2, ry, on: false, int: null };
-  const sh = buildShell(b); scene.add(sh.mesh); targets.push(sh.mesh); b.boxes = sh.boxes; buildings.push(b);
+  const sh = buildShell(b); scene.add(sh.mesh); targets.push(sh.mesh); b.boxes = sh.boxes; b.shell = sh.mesh; buildings.push(b);
   cityFoot.push(new THREE.Box3(new V3(x - w / 2, 0, z - d / 2), new V3(x + w / 2, h, z + d / 2)));
   return b;
 }

@@ -105,7 +105,11 @@ function spawnInterior(b) {
   const set = (x, z) => { put('table', x, z, 0); put('chair', x - 1.3, z, PI / 2); put('chair', x + 1.3, z, -PI / 2); };
   const sit = (x, z, yaw) => { if (crowd.length >= 6) return; let c; try { c = mkCitizen('sitter', x, z, yaw, { home: new V3(x, 0, z), isStatic: true, sit: true }); } catch (e) { return; } if (b.purpose === 'school') c.g.scale.setScalar(0.65); crowd.push(c); };
   if (kind === 'school') { const sets = Math.min(b.w, b.d) >= 9 ? [[-2.4, -1.5], [2.4, -1.5], [-2.4, 1.5], [2.4, 1.5]] : [[0, 0]]; for (const [dx, dz] of sets) { set(b.x + dx, b.z + dz); sit(b.x + dx - 1.3, b.z + dz, PI / 2); sit(b.x + dx + 1.3, b.z + dz, -PI / 2); } }
-  else if (Math.min(b.w, b.d) >= 9) {
+  if (kind === 'school') {
+    const ox = Math.sin(b.ry), oz = Math.cos(b.ry), hf = (b.ry === 0 || b.ry === PI) ? b.d / 2 : b.w / 2, bd = mkBoard(b.id); bd.position.set(b.x - ox * (hf - CT - 0.06), 1.7, b.z - oz * (hf - CT - 0.06)); bd.rotation.y = b.ry; scene.add(bd); groups.push(bd);
+    try { const tx = b.x - ox * (hf - CT - 1.7), tz = b.z - oz * (hf - CT - 1.7), tc = mkCitizen('teacher', tx, tz, b.ry + PI, { home: new V3(tx, 0, tz), isStatic: true, inst: b }); tc.teacher = true; crowd.push(tc); } catch (e) {}
+  }
+  if (kind === 'school') {} else if (Math.min(b.w, b.d) >= 9) {
     if (kind === 'home') { put('rug', b.x, b.z, 0); set(b.x, b.z); } else if (kind === 'office') { set(b.x - 2.5, b.z); set(b.x + 2.5, b.z + 1.5); } else if (kind === 'cafe') { set(b.x - 2.2, b.z); set(b.x + 2.2, b.z); } else put('table', b.x, b.z, 0);
   }
   b.int = { groups, crowd, door: mkCityDoor(b) };

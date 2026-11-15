@@ -35,3 +35,39 @@ for (const b of institutions) {
     rk.position.set(b.x, b.h, b.z); scene.add(rk);
   }
 }
+
+// ---- good-looking materials per institution: wainscot walls, linoleum/parquet/carpet/tile floors, brick/stone facades ----
+const instMat = (wall, floor) => { const w = lamM(mkTex(64, 64, wall)), f = lamM(mkTex(64, 64, floor)); INTWALL.push(w); FLOORMAT.push(f); nightMats.push(w, f); return [INTWALL.length - 1, FLOORMAT.length - 1]; };
+const band = (g, w, h, top, bot, y, rail) => { g.fillStyle = top; g.fillRect(0, 0, w, h); g.fillStyle = bot; g.fillRect(0, h * y, w, h * (1 - y)); g.fillStyle = rail; g.fillRect(0, h * y - 2, w, 3); speck(g, w, h, 160, 'rgba(255,255,255,.12)', 'rgba(0,0,0,.07)'); g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(0, h - 4, w, 4); };
+const INSTMATS = {
+  school: instMat((g, w, h) => band(g, w, h, '#f3e3a5', '#3f7d58', 0.55, '#f7f1d8'), (g, w, h) => { for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) { g.fillStyle = (x + y) % 2 ? '#aebf9a' : '#dfe5cf'; g.fillRect(x * 32, y * 32, 32, 32); } g.strokeStyle = 'rgba(0,0,0,.18)'; g.strokeRect(0.5, 0.5, 63, 63); g.strokeRect(32.5, 0.5, 0, 63); speck(g, w, h, 120, 'rgba(255,255,255,.2)', 'rgba(0,0,0,.08)'); }),
+  university: instMat((g, w, h) => { band(g, w, h, '#efe6d6', '#7a5230', 0.5, '#4a3320'); g.fillStyle = 'rgba(0,0,0,.25)'; for (let x = 0; x < w; x += 10) g.fillRect(x, h * 0.5, 1, h * 0.5); }, (g, w, h) => { for (let r = 0; r < 8; r++) { g.fillStyle = `hsl(25,${rr(40, 50)}%,${rr(28, 38)}%)`; g.fillRect(0, r * 8, w, 8); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, r * 8, w, 1); g.fillRect(((r * 23) % 40) + 8, r * 8, 1, 8); } }),
+  company: instMat((g, w, h) => { band(g, w, h, '#e9edf2', '#2e5c9a', 0.7, '#ffffff'); }, (g, w, h) => { g.fillStyle = '#4b5b73'; g.fillRect(0, 0, w, h); speck(g, w, h, 700, 'rgba(255,255,255,.1)', 'rgba(0,0,0,.18)'); }),
+  nasa: instMat((g, w, h) => band(g, w, h, '#f5f7fa', '#14284f', 0.7, '#e0301e'), (g, w, h) => { g.fillStyle = '#eef2f7'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(70,110,190,.35)'; g.strokeRect(0.5, 0.5, 31, 31); g.strokeRect(32.5, 32.5, 31, 31); g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(33, 1, 30, 30); g.fillRect(1, 33, 30, 30); }),
+};
+const INSTFAC = { school: 1, university: 3, company: 2, nasa: 0 };
+for (const b of institutions) {
+  const [iw, ifl] = INSTMATS[b.purpose]; b.iv = iw; b.fv = ifl; b.v = INSTFAC[b.purpose];
+  if (b.shell) { scene.remove(b.shell); const i = targets.indexOf(b.shell); if (i >= 0) targets.splice(i, 1); b.shell.geometry.dispose(); }
+  const sh = buildShell(b); scene.add(sh.mesh); targets.push(sh.mesh); b.shell = sh.mesh; b.boxes = sh.boxes;
+}
+// ---- school gates (open for the break and when you walk up; locked when the guard is on alert) ----
+function mkGate(b) {
+  const half = (b.ry === 0 || b.ry === Math.PI) ? b.d / 2 : b.w / 2, g = new THREE.Group(), metal = new THREE.MeshLambertMaterial({ color: 0x22352b }), gold = new THREE.MeshLambertMaterial({ color: 0xc9a227 }), stone = new THREE.MeshLambertMaterial({ color: 0xb9b2a5 });
+  const gx = b.x + Math.sin(b.ry) * (half + 1.2), gz = b.z + Math.cos(b.ry) * (half + 1.2); g.position.set(gx, 0, gz); g.rotation.y = b.ry;
+  const add = (geo, mat, x, y, z, p) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); (p || g).add(m); return m; };
+  for (const s of [-1, 1]) { add(new THREE.BoxGeometry(0.5, 2.8, 0.5), stone, s * 3.1, 1.4, 0); add(new THREE.BoxGeometry(0.72, 0.2, 0.72), stone, s * 3.1, 2.9, 0); add(new THREE.SphereGeometry(0.2, 8, 6), gold, s * 3.1, 3.2, 0); }
+  const leaf = side => { const p = new THREE.Group(); p.position.set(side * 2.85, 0, 0); for (let i = 0; i < 10; i++) { add(new THREE.BoxGeometry(0.06, 2.0, 0.06), metal, -side * (0.12 + i * 0.28), 1.2, 0, p); add(new THREE.ConeGeometry(0.06, 0.18, 4), gold, -side * (0.12 + i * 0.28), 2.3, 0, p); } add(new THREE.BoxGeometry(2.8, 0.08, 0.08), metal, -side * 1.4, 0.35, 0, p); add(new THREE.BoxGeometry(2.8, 0.08, 0.08), metal, -side * 1.4, 2.0, 0, p); g.add(p); return p; };
+  const ew = b.ry === 0 || b.ry === Math.PI, hx = ew ? 3 : 0.25, hz = ew ? 0.25 : 3;
+  scene.add(g); b.gate = { g, L: leaf(-1), R: leaf(1), key: 'gate' + b.id, box: new THREE.Box3(new V3(gx - hx, 0, gz - hz), new V3(gx + hx, 2.4, gz + hz)), a: 0, solid: false, x: gx, z: gz };
+  b.post = { x: gx + Math.cos(b.ry) * 3.9 + Math.sin(b.ry) * 0.9, z: gz - Math.sin(b.ry) * 3.9 + Math.cos(b.ry) * 0.9 };
+}
+for (const b of institutions) if (b.purpose === 'school') mkGate(b);
+function mkBoard(seed) {
+  const L = ['2 + 3 = 5', 'A  B  C  D', '1/2 + 1/4 = 3/4', 'The Water Cycle', 'Planets: Mercury, Venus...', 'x + 4 = 9'], txt = L[seed % L.length];
+  const g = new THREE.Group(), wood = new THREE.MeshLambertMaterial({ color: 0x7a5230 });
+  const tex = mkTex(256, 80, (c, w, h) => { c.fillStyle = '#25483a'; c.fillRect(0, 0, w, h); speck(c, w, h, 600, 'rgba(255,255,255,.05)', 'rgba(0,0,0,.12)'); c.fillStyle = 'rgba(255,255,255,.85)'; c.font = 'bold 30px "Comic Sans MS", cursive'; c.textAlign = 'center'; c.fillText(txt, w / 2, h / 2 + 4, w - 20); c.font = '18px cursive'; c.fillText('Homework: page ' + (seed % 9 + 2), w / 2, h - 12, w - 20); });
+  const slate = new THREE.Mesh(new THREE.PlaneGeometry(5, 1.6), new THREE.MeshLambertMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.12 })); g.add(slate);
+  for (const [w, h, x, y] of [[5.2, 0.12, 0, 0.86], [5.2, 0.12, 0, -0.86], [0.12, 1.84, -2.56, 0], [0.12, 1.84, 2.56, 0]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.1), wood); m.position.set(x, y, 0.03); g.add(m); }
+  const tray = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.06, 0.18), wood); tray.position.set(0, -0.9, 0.12); g.add(tray); return g;
+}

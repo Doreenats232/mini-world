@@ -13,6 +13,8 @@ const CLINES = {
   vendor: ['Fresh fruit! Get your fruit!', 'Best prices in town!', 'Come and look, friend!', 'Apples, bananas, mangoes!'],
   chatter: ['Did you hear about the new tower?', 'Haha, no way!', 'And then he said...', "That's what I told him."],
   sitter: ['Just resting my feet.', 'Nice spot for a break.', 'Watching the town go by.'],
+  teacher: ['Open your books to page ten.', 'Who knows the answer?', 'Quiet, please!', 'Homework is due tomorrow.'],
+  guard: ['Good morning. School zone, mind the kids.', 'Keep moving, sir.', 'No trouble here, please.'],
   student: ['Exams next week...', 'Have you finished the assignment?', 'Studying is hard!', 'Best university in town.'],
   suit: ['Meeting in five minutes.', 'Busy day at the office.', 'Business is booming.', 'Sorry, no time to chat.'],
   kid: ['Wheee!', 'Catch me!', 'Are you a builder?', 'I want a bike!'],
@@ -60,6 +62,8 @@ function outfit(job) {
   if (job === 'shopper') o.bag = pick([0xc0392b, 0x2980b9, 0xf1c40f, 0xecf0f1]);
   if (job === 'cyclist') Object.assign(o, { hat: pick([0xff4d4d, 0x4dd2ff, 0xf1c40f]), pack: 0 });
   if (job === 'sweeper') Object.assign(o, { hat: 0x2ecc71, vest: 0x2ecc71, pack: 0 });
+  if (job === 'teacher') Object.assign(o, { glasses: true, shirt: 0x8e6bbf, pants: 0x3b3b4f, hat: 0, pack: 0 });
+  if (job === 'guard') Object.assign(o, { hat: 0x1b2a49, shirt: 0x1b2a49, pants: 0x14213d, pack: 0, glasses: false });
   if (job === 'student') Object.assign(o, { pack: pick(SHIRTS), hat: 0 });
   if (job === 'suit') Object.assign(o, { shirt: 0xecf0f1, pants: 0x2c3e50, hat: 0, pack: 0, glasses: Math.random() < 0.4 });
   return o;
@@ -150,7 +154,7 @@ function citizenSay(c, text) {
 }
 const nearestCitizen = () => { let b = null, bd = 2.8; for (const c of citizens) { if (c.hidden || c.dead) continue; const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; b = c; } } return b; };
 function tryTalk() { const c = nearestCitizen(); if (!c) return false; citizenSay(c, pick(CLINES[c.job] || CLINES.walker)); c.faceT = 3; sfx('click'); return true; }
-function scareOne(c, from, t) { c.fleeT = t; c.from.set(from.x, 0, from.z); c.sit = false; if (Math.random() < 0.5) citizenSay(c, pick(['Aah!', 'Run!', 'Help!', 'Watch out!'])); }
+function scareOne(c, from, t) { if (c.job === 'guard') return; c.fleeT = t; c.from.set(from.x, 0, from.z); c.sit = false; if (Math.random() < 0.5) citizenSay(c, pick(['Aah!', 'Run!', 'Help!', 'Watch out!'])); }
 function scare(pos, r) { for (const c of citizens) if (!c.hidden && !c.dead && dist2(c.pos, pos) < r) scareOne(c, pos, 6); }
 
 function animWalk(c, sp, dt, arm) { c.ph += dt * sp * 1.7; const w = Math.sin(c.ph) * (arm || 0.8); c.lL.rotation.x = -w; c.lR.rotation.x = w; c.aL.rotation.x = w; c.aR.rotation.x = -w; }
@@ -194,7 +198,21 @@ function citizenStep(c, dt) {
       break;
     }
     case 'watcher': if (c.site.status === 'complete') { c.cheer = (c.cheer || 0) + dt; animStand(c); c.aL.rotation.x = c.aR.rotation.x = -2.6 + Math.sin(c.t * 14) * 0.5; if (!c.clapped) { c.clapped = true; citizenSay(c, pick(['Bravo!', 'Beautiful!', 'What a building!'])); } if (c.cheer > 6) { c.job = 'walker'; c.isStatic = false; c.resnap = true; c.doorT = 5; } } else { animStand(c); c.yaw = Math.atan2(c.site.x - c.pos.x, c.site.z - c.pos.z); } break;
-    case 'kid': { if (moveToward(c, c.tgt, 4.2, dt) || c.t % 3 < dt) { if (c.inst) c.tgt.copy(instTgt(c)); else c.tgt.set(c.home.x + (Math.random() - 0.5) * 14, 0, c.home.z + (Math.random() - 0.5) * 14); } animWalk(c, 4.2, dt, 1.1); c.bounce = Math.abs(Math.sin(c.t * 9)) * 0.12; break; }
+    case 'kid': { if (c.inst && c.goIn) { if (moveToward(c, doorPt(c.inst), 4, dt)) removeCitizen(c); animWalk(c, 4.2, dt, 1.1); break; } if (c.inst && c.goHome) { if (moveToward(c, c.homeTgt, 3.4, dt)) removeCitizen(c); animWalk(c, 3.4, dt, 1); break; }
+if (moveToward(c, c.tgt, 4.2, dt) || c.t % 3 < dt) { if (c.inst) c.tgt.copy(instTgt(c)); else c.tgt.set(c.home.x + (Math.random() - 0.5) * 14, 0, c.home.z + (Math.random() - 0.5) * 14); } animWalk(c, 4.2, dt, 1.1); c.bounce = Math.abs(Math.sin(c.t * 9)) * 0.12; break; }
+    case 'teacher': { c.teachT = (c.teachT || 0) + dt; const face = c.teachT % 12 > 8; c.yaw = c.inst.ry + (face ? 0 : Math.PI); animStand(c); c.aR.rotation.x = face ? -0.3 : -2.0 + Math.sin(c.t * 3) * 0.35; break; }
+    case 'guard': {
+      const b = c.inst, T = inCar ? inCar.pos : P.pos, d = dist2(c.pos, T);
+      if (b && b.alert > 0) {
+        if (!c.alerted) { c.alerted = true; citizenSay(c, pick(['HEY! STOP RIGHT THERE!', 'Security! Get away from the children!', 'You! Hands where I can see them!'])); }
+        const shooting = mode === 'fight' && (cool > 0 || held);
+        c.yaw = Math.atan2(T.x - c.pos.x, T.z - c.pos.z);
+        if (d > 6 && d < 30 && shooting) { animStand(c); c.aR.rotation.x = -1.5; c.gunT = (c.gunT || 0) - dt; if (c.gunT <= 0) { c.gunT = 1.3; sfxAt(c.pos, 'shoot'); if (Math.random() < 0.3) hurt(6, true); } }
+        else if (d > 1.7) { moveToward(c, T, 5.4, dt); animWalk(c, 5.4, dt, 1); c.aR.rotation.x = -1.4; }
+        else { animStand(c); c.aR.rotation.x = -1.5 + Math.sin(c.t * 14) * 0.9; c.hitT = (c.hitT || 0) - dt; if (c.hitT <= 0) { c.hitT = 0.9; hurt(inCar ? 4 : 9, true); sfxAt(c.pos, 'punch'); } }
+      } else { c.alerted = false; if (moveToward(c, c.home, 3, dt)) { c.yaw = b.ry; animStand(c); c.aR.rotation.x = 0; } else animWalk(c, 3, dt, 0.8); }
+      break;
+    }
     case 'student': case 'suit': { if (moveToward(c, c.tgt, 1.6, dt) || c.t % 6 < dt) { if (c.inst) c.tgt.copy(instTgt(c)); } animWalk(c, 1.6, dt, 0.8); break; }
     case 'worker': c.lL.rotation.x = 0; c.lR.rotation.x = 0; c.aL.rotation.x = 0; c.aR.rotation.x = -1.1 + Math.sin(c.t * 12) * 0.6; if (Math.sin(c.t * 12) > 0.98 && dp < 25) sfxAt(c.pos, 'chop'); break;
     case 'vendor': animStand(c); c.aR.rotation.x = c.t % 6 < 1 ? -2.2 + Math.sin(c.t * 10) * 0.3 : 0; break;
