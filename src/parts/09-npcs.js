@@ -40,7 +40,7 @@ function mkNpc(d) {
 NPCDEF.forEach(mkNpc);
 const nearestNpc = pos => { let b = null, bd = 1e9; for (const n of npcs) { const d = dist2(n.pos, pos); if (d < bd) { bd = d; b = n; } } return b; };
 const COSTRES = i => BLOCKS[i][1];
-function logLine(txt, cls) { if (net.on && net.host && cls !== 'me') nsend({ t: 'log', txt, cls }); const d = document.createElement('div'); d.textContent = txt; if (cls) d.className = cls; const L = $('log'); L.appendChild(d); while (L.children.length > 10) L.firstChild.remove(); setTimeout(() => d.remove(), 90000); }
+function logLine(txt, cls) { if (net.on && net.host && cls !== 'me') nsend({ t: 'log', txt, cls }); if (cls !== 'me' && !String(txt).startsWith('⚠')) return; const d = document.createElement('div'); d.textContent = txt; if (cls) d.className = cls; const L = $('log'); L.appendChild(d); while (L.children.length > 10) L.firstChild.remove(); setTimeout(() => d.remove(), 90000); }
 let events = [];
 const ev = t => { events.push(t); logLine('· ' + t, 'ev'); };
 function say(n, t) { t = String(t || '').slice(0, 220); if (!t) return; if (net.on && net.host) nsend({ t: 'say', id: n.id, text: t }); n.bub.textContent = t; n.bubT = 8 + t.length / 12; logLine(n.name + ': ' + t); }
