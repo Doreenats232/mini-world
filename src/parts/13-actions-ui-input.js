@@ -24,8 +24,9 @@ function shoot() {
   for (let i = 0; i < (sg ? 7 : 1); i++) {
     gun.setFromCamera({ x: sg ? (Math.random() - 0.5) * 0.14 : 0, y: sg ? (Math.random() - 0.5) * 0.14 : 0 }, cam);
     let h = gun.intersectObjects([...targets, ...enemyMeshes], false)[0], carHit = null;
-    const ch = gun.intersectObjects(cars.map(c => c.body), true)[0]; if (ch && (!h || ch.distance < h.distance)) { h = ch; let o = ch.object; while (o && !o.userData.car) o = o.parent; carHit = o && o.userData.car; }
-    if (carHit) damageCar(carHit, (sg ? 6 : 12) * dm, true);
+    const ch = gun.intersectObjects(cars.flatMap(c => [c.body, ...c.wheels.map(w => w.pivot)]), true)[0]; let tireHit = null;
+    if (ch && (!h || ch.distance < h.distance)) { h = ch; let o = ch.object; while (o && !o.userData.car && !o.userData.wheelOf) o = o.parent; if (o && o.userData.wheelOf) { tireHit = o.userData.wheelOf; carHit = tireHit.c; } else carHit = o && o.userData.car; }
+    if (tireHit) { popTire(tireHit.c, tireHit.w, true); damageCar(carHit, 3, true); } else if (carHit) damageCar(carHit, (sg ? 6 : 12) * dm, true);
     tracer(h ? h.point : gun.ray.at(gun.far, new V3()));
     if (h) spark(h.point, h.object.userData.enemy ? 0xff6a3d : 0xffe9a0);
     if (h && h.object.userData.enemy) damageEnemy(h.object.userData.enemy, (h.object.userData.head ? (sg ? 28 : 60) : (sg ? 14 : 25)) * dm);

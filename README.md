@@ -6,3 +6,4 @@
 
 ## Credits
 Ferrari 458 model: vicent091036 (CC-BY 4.0), via the three.js examples (public/models/ferrari.glb).
+Soldier character: Mixamo free model via the three.js examples (public/models/soldier.glb).

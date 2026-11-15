@@ -25,13 +25,15 @@ function hashColor(name) { let h = 0; for (const ch of name) h = (h * 31 + ch.ch
 function mkAvatar(id, name) {
   const H = mkHuman({ skin: [0xf1c8a5, 0xc68e5e, 0x8d5a3b, 0xe0b48f][name.length % 4], shirt: hashColor(name).getHex(), pants: 0x2d3436, hair: 0x2a1a0e, role: 'player' }), g = H.g; scene.add(g);
   const el = document.createElement('div'); el.className = 'nl'; const bub = document.createElement('div'); bub.className = 'bub'; const nm = document.createElement('div'); nm.innerHTML = '<b style="color:#7fe7ff"></b>'; nm.firstChild.textContent = name; el.append(bub, nm); $('labels').appendChild(el);
-  net.remotes.set(id, { id, name, g, aL: H.aL, aR: H.aR, lL: H.lL, lR: H.lR, el, bub, pos: new V3(0, -50, 0), tp: new V3(0, -50, 0), yaw: 0, first: true, bubT: 0 });
+  const sold = SOLDIER ? (g.children.forEach(m => { m.visible = false; }), makeSoldier(hashColor(name).getHex(), 1.0)) : null; if (sold) g.add(sold.root);
+  net.remotes.set(id, { id, name, g, sold, aL: H.aL, aR: H.aR, lL: H.lL, lR: H.lR, el, bub, pos: new V3(0, -50, 0), tp: new V3(0, -50, 0), yaw: 0, first: true, bubT: 0 });
 }
 function removeAvatar(id) { const r = net.remotes.get(id); if (!r) return; scene.remove(r.g); r.el.remove(); net.remotes.delete(id); }
 function updateRemotes(dt) {
   for (const r of net.remotes.values()) {
     const b = r.pos.clone(); r.pos.lerp(r.tp, Math.min(1, dt * 12)); const sp = r.pos.distanceTo(b) / Math.max(dt, 0.001);
     r.g.position.copy(r.pos); let dr = r.yaw + Math.PI - r.g.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); r.g.rotation.y += dr * Math.min(1, dt * 10);
+    if (r.sold) { soldAnim(r.sold, sp > 5 ? 'Run' : sp > 0.6 ? 'Walk' : 'Idle'); r.sold.mixer.update(dt); }
     const w = sp > 0.6 ? Math.sin(clock * 9) * 0.8 : 0; r.aL.rotation.x = w; r.aR.rotation.x = -w; r.lL.rotation.x = -w; r.lR.rotation.x = w;
     r.bubT -= dt; r.bub.style.display = r.bubT > 0 ? 'block' : 'none';
     const v = new V3(r.pos.x, r.pos.y + 2.5, r.pos.z).project(cam);

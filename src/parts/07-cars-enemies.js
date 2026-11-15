@@ -3,7 +3,7 @@ const cars = [];
 function mkCar(x, z, h, col, owned = false, type, ai = false) {
   const t = type || ['sedan', 'hatch', 'suv', 'sport', 'taxi'][Math.floor(Math.random() * 5)], M = mkCarModel(t, t === 'taxi' ? 0xf5c518 : col, ai), g = M.g;
   g.position.set(x, 0, z); g.rotation.y = h; scene.add(g);
-  const car = { mesh: g, body: M.body, wheels: M.wheels, wr: M.wr, pos: new V3(x, 0, z), h, speed: 0, owned, type: t, spin: 0, steerV: 0, ai: ai ? {} : null }; initCarDamage(car); cars.push(car); return car;
+  const car = { mesh: g, body: M.body, wheels: M.wheels, wr: M.wr, pos: new V3(x, 0, z), h, speed: 0, owned, type: t, spin: 0, steerV: 0, ai: ai ? {} : null, hood: M.hood, trunk: M.trunk, doors: M.doors || [], hoodA: 0, trunkA: 0, doorA: 0, doorT: 0, flats: 0, pull: 0 }; g.userData.car = car; for (const w of car.wheels) w.pivot.userData.wheelOf = { c: car, w }; initCarDamage(car); cars.push(car); return car;
 }
 mkCar(25, 45, 0, 0xd62828); mkCar(45, 25, Math.PI / 2, 0x2a9d8f); mkCar(-25, -5, 0, 0xf4a261); mkCar(75, -25, Math.PI / 2, 0x6a4c93);
 mkBike(30, 33, 0.6); mkBike(18, 12, -0.8); mkBike(-20, 8, 2.2);
@@ -11,18 +11,18 @@ function toggleCar() {
   if (!inCar && shopNear()) { openShop(); return; }
   if (!inCar && tryUse()) return;
   if (!inCar && tryTalk()) return;
-  if (inCar) { const c = inCar; inCar = null; c.speed = 0; if (c.rider) c.rider.visible = false; stopEngine(); P.pos.set(c.pos.x + Math.cos(c.h) * 3, 0, c.pos.z - Math.sin(c.h) * 3); P.vel.set(0, 0, 0); P.yaw = c.h + Math.PI; P.pitch = 0; return; }
+  if (inCar) { const c = inCar; inCar = null; c.speed = 0; c.doorT = 1.3; if (c.rider) c.rider.visible = false; stopEngine(); P.pos.set(c.pos.x + Math.cos(c.h) * 3, 0, c.pos.z - Math.sin(c.h) * 3); P.vel.set(0, 0, 0); P.yaw = c.h + Math.PI; P.pitch = 0; return; }
   let best = null, bd = 5;
   for (const c of cars) { if (c.dead) continue; const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; best = c; } }
-  if (best) { inCar = best; if (best.bike) { best.rider.visible = true; msg('Bike: W/S pedal, A/D steer, Space brake, E hop off', 2500); } else startEngine(); if (best.ai) { best.ai = null; msg('Carjacked!', 1500); } if (!best.bike && !best.owned && !best.stolen) { best.stolen = true; crime(1, 'car theft'); } if (!best.bike) msg('W/S drive, A/D steer, Space brake, E exit', 2500); } else msg('No car nearby', 900);
+  if (best) { inCar = best; best.doorT = 1.2; if (best.bike) { best.rider.visible = true; msg('Bike: W/S pedal, A/D steer, Space brake, E hop off', 2500); } else startEngine(); if (best.ai) { best.ai = null; msg('Carjacked!', 1500); } if (!best.bike && !best.owned && !best.stolen) { best.stolen = true; crime(1, 'car theft'); } if (!best.bike) msg('W/S drive, A/D steer, Space brake, E exit', 2500); } else msg('No car nearby', 900);
 }
 function driveCar(dt) {
   if (inCar.bike) return driveBike(dt);
   const c = inCar, thr = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - joy.y, steer = (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) - joy.x;
   if (Math.abs(thr) > 0.1) c.speed += thr * 18 * dt; else c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 8 * dt);
   if (keys.Space) c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 25 * dt);
-  c.speed = Math.max(-8, Math.min(26, c.speed)); engine(Math.abs(c.speed));
-  c.h += steer * 1.8 * dt * Math.max(-1, Math.min(1, c.speed / 5));
+  c.speed = Math.max(-8, Math.min(26 * (1 - 0.2 * c.flats), c.speed)); engine(Math.abs(c.speed));
+  c.h += steer * 1.8 * dt * Math.max(-1, Math.min(1, c.speed / 5)) * (1 - 0.15 * c.flats) + c.pull * 0.14 * dt * Math.min(1, Math.abs(c.speed) / 8);
   const t = { pos: new V3(c.pos.x + Math.sin(c.h) * c.speed * dt, 0, c.pos.z + Math.cos(c.h) * c.speed * dt), R: 1.3, H: 1.2 };
   let bad = false; for (const b of solids.values()) if (hit(t, b)) { bad = true; break; }
   let rammed = null; for (const o of cars) if (o !== c && dist2(o.pos, t.pos) < 2.8) { bad = true; rammed = o; }
@@ -63,7 +63,7 @@ function mkEnemy(x, z) {
   g.add(legs, torso, head); g.position.set(x, 0, z); scene.add(g);
   const e = { ...mkEnt(x, 0, z, 0.4, 1.95), mesh: g, hp: 60, mat, col, hurt: 0, cd: 0, wa: 0, wt: 0, dead: false };
   [legs, torso, head].forEach(m => { m.userData.enemy = e; enemyMeshes.push(m); });
-  head.userData.head = true; enemies.push(e);
+  head.userData.head = true; enemies.push(e); attachSoldier(e, [0xcc5555, 0xa070e0, 0x5599cc, 0xc9a24a][Math.floor(Math.random() * 4)]);
 }
 function spawnEnemy() {
   for (let t = 0; t < 10; t++) {

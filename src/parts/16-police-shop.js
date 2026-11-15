@@ -16,7 +16,7 @@ function mkCop(x, z) {
   const badge = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.05), new THREE.MeshLambertMaterial({ color: 0xffd400 })); badge.position.set(0.2, 1.3, 0.27);
   g.add(legs, torso, head, cap, badge); g.position.set(x, 0, z); scene.add(g);
   const e = { ...mkEnt(x, 0, z, 0.4, 1.95), mesh: g, hp: 80, mat: tm, col: 0x1d3a8a, hurt: 0, cd: 1, dead: false, cop: true };
-  [legs, torso, head, cap].forEach(m => { m.userData.enemy = e; enemyMeshes.push(m); }); head.userData.head = true; cops.push(e);
+  [legs, torso, head, cap].forEach(m => { m.userData.enemy = e; enemyMeshes.push(m); }); head.userData.head = true; cops.push(e); attachSoldier(e, 0x5d86e8);
 }
 function spawnCop() {
   for (let t = 0; t < 12; t++) {

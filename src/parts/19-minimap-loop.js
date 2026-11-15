@@ -39,7 +39,7 @@ let last = performance.now(), spawnT = 0;
 ren.setAnimationLoop(now => {
   const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
   cityT -= dt; if (cityT <= 0) { cityT = 0.3; updateCity(); }
-  updateSky(dt); updateUse(dt); updateCitizens(dt); updateTraffic(dt); updateViewmodel(dt); updateFx(dt); updateCarFx(dt);
+  updateSky(dt); updateUse(dt); updateCitizens(dt); updateTraffic(dt); updateViewmodel(dt); updateFx(dt); updateCarFx(dt); updateSoldiers(dt);
   { const pre = isTouch ? 'Tap CAR: ' : 'Press E: '; let ht = ''; if (!inCar && !shopOpen) { if (shopNear()) ht = pre + 'open shop'; else { const u = nearestUse(); if (u) ht = pre + USEN[u.f]; else { const cz = nearestCitizen(); if (cz) ht = pre + 'talk to ' + cz.name + ' (' + cz.job + ')'; } } } if (ht !== hintTxt) { hintTxt = ht; $('hint').textContent = ht; $('hint').style.display = ht ? 'block' : 'none'; } }
   miniT -= dt; if (miniT <= 0) { miniT = 0.066; drawMini(); }
   if (inCar) driveCar(dt); else playerStep(dt);

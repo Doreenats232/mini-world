@@ -23,8 +23,6 @@ function mkCarModel(typeName, col, driver) {
   const T = CAR_TYPES[typeName] || CAR_TYPES.sedan, L = T.L, W = T.W, wr = T.wr, y0 = wr * 0.85, bh = T.bodyH;
   const body = [], glass = [], head = [], tail = [], g = new THREE.Group(), bodyG = new THREE.Group(), B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
   body.push(cgeo(B(W, bh, L), 0, y0 + bh / 2, 0, col));
-  body.push(cgeo(taper(W - 0.08, 0.16, T.hoodL, 1, 0.8), 0, y0 + bh + 0.08, L / 2 - T.hoodL / 2 - 0.05, col));
-  body.push(cgeo(taper(W - 0.08, 0.14, 0.85, 1, 0.85), 0, y0 + bh + 0.07, -L / 2 + 0.5, col));
   const cy = y0 + bh + 0.14 + T.cabH / 2, cw = W - 0.26;
   glass.push(cgeo(taper(cw, T.cabH, T.cabL, 0.9, 0.7), 0, cy, T.cabZ, 0x1b2a38));
   body.push(cgeo(B(cw * 0.9, 0.07, T.cabL * 0.7 + 0.12), 0, cy + T.cabH / 2 + 0.03, T.cabZ, col));
@@ -38,6 +36,11 @@ function mkCarModel(typeName, col, driver) {
   if (typeName === 'taxi') body.push(cgeo(B(0.55, 0.15, 0.25), 0, cy + T.cabH / 2 + 0.17, T.cabZ, 0xffe14d));
   const mk = (list, mat) => bodyG.add(new THREE.Mesh(mergeGeometries(list, false), mat));
   mk(body, CARBODY); mk(glass, CARGLASS); mk(head, CARHEAD); mk(tail, CARTAIL); g.add(bodyG);
+  // moving parts: hood, trunk lid and two doors are separate hinged meshes
+  const mkP = (geo, px, py, pz) => { const p = new THREE.Group(); p.position.set(px, py, pz); p.add(new THREE.Mesh(geo, CARBODY)); bodyG.add(p); return p; };
+  const hood = mkP(cgeo(taper(W - 0.08, 0.16, T.hoodL, 1, 0.8), 0, 0, T.hoodL / 2, col), 0, y0 + bh + 0.08, L / 2 - T.hoodL - 0.05);
+  const trunk = mkP(cgeo(taper(W - 0.08, 0.14, 0.85, 1, 0.85), 0, 0, -0.425, col), 0, y0 + bh + 0.07, -L / 2 + 0.5 + 0.425);
+  const dl = T.cabL * 0.55, doors = [-1, 1].map(sx => ({ sx, pivot: mkP(cgeo(B(0.07, bh * 0.85, dl), 0, 0, -dl / 2, col), sx * (W / 2 + 0.01), y0 + bh * 0.5, T.cabZ + T.cabL * 0.28) }));
   const wheels = [];
   for (const [sx, sz, front] of [[-1, 1, 1], [1, 1, 1], [-1, -1, 0], [1, -1, 0]]) {
     const tire = new THREE.CylinderGeometry(wr, wr, 0.3, 16), rim = new THREE.CylinderGeometry(wr * 0.6, wr * 0.6, 0.32, 10), hub = new THREE.CylinderGeometry(wr * 0.2, wr * 0.2, 0.34, 6);
@@ -47,7 +50,7 @@ function mkCarModel(typeName, col, driver) {
     pivot.position.set(sx * (W / 2 - 0.08), wr, sz * (L / 2 - 0.85)); pivot.add(spin); g.add(pivot); wheels.push({ pivot, spin, front });
   }
   g.add(new THREE.Mesh(new THREE.PlaneGeometry(2.6, 6).rotateX(-Math.PI / 2).translate(0, 0.05, L / 2 + 3.3), CARBEAM), new THREE.Mesh(new THREE.PlaneGeometry(W + 0.5, L + 0.5).rotateX(-Math.PI / 2).translate(0, 0.045, 0), CARSHADOW));
-  return { g, body: bodyG, wheels, wr };
+  return { g, body: bodyG, wheels, wr, hood, trunk, doors };
 }
 function animCar(c, dt, steer, thr) {
   c.spin += c.speed * dt / c.wr; c.steerV += ((steer || 0) - c.steerV) * Math.min(1, dt * 8);
