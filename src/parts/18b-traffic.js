@@ -30,7 +30,7 @@ function trafficStep(c, dt) {
   if (block && c.speed < 0.6 && dist2(c.pos, P.pos) < 10) { a.horn = (a.horn || 0) + dt; if (a.horn > 2.5) { a.horn = 0; sfxAt(c.pos, 'horn'); } }
   const ax = a.axis, lt = ax === 'x' ? 'z' : 'x', laneT = a.line + (ax === 'x' ? a.dir : -a.dir) * 3;
   c.pos[ax] += a.dir * c.speed * dt; c.pos[lt] += (laneT - c.pos[lt]) * Math.min(1, dt * 2);
-  if ((c.pos[ax] - a.nextI) * a.dir >= 0) { const here = a.nextI; if (Math.random() < 0.4) { a.axis = lt; a.line = here; a.dir = Math.random() < 0.5 ? 1 : -1; } let nx = nextI(c.pos[a.axis], a.dir); if (nx < -375 || nx > 325) { a.dir = -a.dir; nx = nextI(c.pos[a.axis], a.dir); } a.nextI = nx; }
+  if ((c.pos[ax] - a.nextI) * a.dir >= 0) { const here = a.nextI; if (Math.random() < 0.4) { a.axis = lt; a.line = here; a.dir = Math.random() < 0.5 ? 1 : -1; } let nx = nextI(c.pos[a.axis], a.dir); if (nx < WB.lo || nx > WB.hi) { a.dir = -a.dir; nx = nextI(c.pos[a.axis], a.dir); } a.nextI = nx; }
   const hT = a.axis === 'x' ? Math.atan2(a.dir, 0) : Math.atan2(0, a.dir), dh = Math.atan2(Math.sin(hT - c.h), Math.cos(hT - c.h)); c.h += dh * Math.min(1, dt * 3);
   c.mesh.position.copy(c.pos); c.mesh.rotation.y = c.h; animCar(c, dt, dh * 1.5, 0);
 }

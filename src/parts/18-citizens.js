@@ -103,7 +103,7 @@ function roadSpot() {
   return null;
 }
 function mkCitizen(job, x, z, yaw, extra) {
-  const M = mkCitizenModel(outfit(job)), g = M.g; g.position.set(x, 0, z); scene.add(g); if (job === 'kid') g.scale.setScalar(0.65);
+  const M = mkCitizenModel(outfit((extra && extra.role) || job)), g = M.g; g.position.set(x, 0, z); scene.add(g); if (job === 'kid') g.scale.setScalar(0.65);
   const c = Object.assign({ id: ++citSeq, job, name: pick(NAMES), g, aL: M.aL, aR: M.aR, lL: M.lL, lR: M.lR, pos: new V3(x, 0, z), yaw: yaw || 0, vyaw: yaw || 0, t: Math.random() * 10, ph: Math.random() * 6, state: 'walk', fleeT: 0, chk: 0, from: new V3(), hidden: false, extras: [], speakT: 4 + Math.random() * 8, faceT: 0, dead: false }, extra || {});
   citizens.push(c); return c;
 }
@@ -137,7 +137,7 @@ function spawnJob(job) {
 function manageCitizens() {
   const cap = isTouch ? 30 : 64, target = Math.round(cap * (0.35 + 0.65 * dayLight));
   for (let i = citizens.length - 1; i >= 0; i--) { const c = citizens[i]; if (c && !c.dead && dist2(c.pos, P.pos) > (c.hidden ? 160 : 140)) removeCitizen(c); }
-  if (citizens.length > target + 2) { let f = null, fd = 0; for (const c of citizens) { const d = dist2(c.pos, P.pos); if (d > fd) { fd = d; f = c; } } if (f && fd > 45) removeCitizen(f); }
+  if (citizens.length > target + 2) { let f = null, fd = 0; for (const c of citizens) { const d = dist2(c.pos, P.pos); if (d > fd && !c.res) { fd = d; f = c; } } if (f && fd > 45) removeCitizen(f); }
   else if (citizens.length < target && citizens.length < 90) {
     const counts = {}; citizens.forEach(c => { counts[c.job] = (counts[c.job] || 0) + 1; });
     const site = structures.find(s => s.status === 'building' && s.x != null && Math.hypot(s.x - P.pos.x, s.z - P.pos.z) < 120);
@@ -153,7 +153,7 @@ function citizenSay(c, text) {
   b.c = c; b.t = 3.5 + text.length / 14; b.bub.textContent = c.name + ': ' + text; b.el.style.display = 'block';
 }
 const nearestCitizen = () => { let b = null, bd = 2.8; for (const c of citizens) { if (c.hidden || c.dead) continue; const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; b = c; } } return b; };
-function tryTalk() { const c = nearestCitizen(); if (!c) return false; citizenSay(c, pick(CLINES[c.job] || CLINES.walker)); c.faceT = 3; sfx('click'); return true; }
+function tryTalk() { const c = nearestCitizen(); if (!c) return false; const r = c.res; citizenSay(c, r && Math.random() < 0.6 ? (r.st === 'toWork' ? 'Heading to work at ' + r.workName + '.' : r.st === 'toHome' ? 'Finished at ' + r.workName + ', going home.' : 'I work at ' + r.workName + '.') : pick(CLINES[c.role || c.job] || CLINES.walker)); c.faceT = 3; sfx('click'); return true; }
 function scareOne(c, from, t) { if (c.job === 'guard') return; c.fleeT = t; c.from.set(from.x, 0, from.z); c.sit = false; if (Math.random() < 0.5) citizenSay(c, pick(['Aah!', 'Run!', 'Help!', 'Watch out!'])); }
 function scare(pos, r) { for (const c of citizens) if (!c.hidden && !c.dead && dist2(c.pos, pos) < r) scareOne(c, pos, 6); }
 
@@ -213,6 +213,7 @@ if (moveToward(c, c.tgt, 4.2, dt) || c.t % 3 < dt) { if (c.inst) c.tgt.copy(inst
       } else { c.alerted = false; if (moveToward(c, c.home, 3, dt)) { c.yaw = b.ry; animStand(c); c.aR.rotation.x = 0; } else animWalk(c, 3, dt, 0.8); }
       break;
     }
+    case 'commuter': animWalk(c, WALK_SP, dt, 0.85); break;
     case 'student': case 'suit': { if (moveToward(c, c.tgt, 1.6, dt) || c.t % 6 < dt) { if (c.inst) c.tgt.copy(instTgt(c)); } animWalk(c, 1.6, dt, 0.8); break; }
     case 'worker': c.lL.rotation.x = 0; c.lR.rotation.x = 0; c.aL.rotation.x = 0; c.aR.rotation.x = -1.1 + Math.sin(c.t * 12) * 0.6; if (Math.sin(c.t * 12) > 0.98 && dp < 25) sfxAt(c.pos, 'chop'); break;
     case 'vendor': animStand(c); c.aR.rotation.x = c.t % 6 < 1 ? -2.2 + Math.sin(c.t * 10) * 0.3 : 0; break;
