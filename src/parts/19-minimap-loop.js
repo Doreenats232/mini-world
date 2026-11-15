@@ -32,20 +32,21 @@ function drawMini() {
 // ---------- loop ----------
 hud();
 for (let i = 0; i < 6; i++) spawnEnemy();
+msg(isTouch ? 'FIGHT mode: SHOOT and PUNCH buttons (MODE = build)' : 'FIGHT mode: click = shoot, F = punch, Q = build mode', 5000);
 logLine('Press T (or CHAT) to talk to Archie, Mason and Ranger. ⚙ = set your relay key.', 'ev');
 if (!REL.key) setTimeout(() => logLine('Your NPCs are in scripted mode (no AI key). Tap ⚙, paste your RelayAPI key and press Test connection so they can really talk and think.', 'ev'), 4000);
 let last = performance.now(), spawnT = 0;
 ren.setAnimationLoop(now => {
   const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
   cityT -= dt; if (cityT <= 0) { cityT = 0.3; updateCity(); }
-  updateSky(dt); updateUse(dt); updateCitizens(dt);
+  updateSky(dt); updateUse(dt); updateCitizens(dt); updateTraffic(dt); updateViewmodel(dt); updateFx(dt);
   { const pre = isTouch ? 'Tap CAR: ' : 'Press E: '; let ht = ''; if (!inCar && !shopOpen) { if (shopNear()) ht = pre + 'open shop'; else { const u = nearestUse(); if (u) ht = pre + USEN[u.f]; else { const cz = nearestCitizen(); if (cz) ht = pre + 'talk to ' + cz.name + ' (' + cz.job + ')'; } } } if (ht !== hintTxt) { hintTxt = ht; $('hint').textContent = ht; $('hint').style.display = ht ? 'block' : 'none'; } }
   miniT -= dt; if (miniT <= 0) { miniT = 0.066; drawMini(); }
   if (inCar) driveCar(dt); else playerStep(dt);
   if (held && mode === 'fight' && !inCar) shoot();
-  for (let i = enemies.length - 1; i >= 0; i--) { if (enemies[i].dead) enemies.splice(i, 1); else enemyStep(enemies[i], dt); }
+  for (let i = enemies.length - 1; i >= 0; i--) { if (!enemies[i]) continue; if (enemies[i].dead) enemies.splice(i, 1); else enemyStep(enemies[i], dt); }
   spawnT -= dt; if (spawnT <= 0 && enemies.length < 10) { spawnEnemy(); spawnT = 3; }
-  for (let i = cops.length - 1; i >= 0; i--) { if (cops[i].dead) cops.splice(i, 1); else copStep(cops[i], dt); }
+  for (let i = cops.length - 1; i >= 0; i--) { if (!cops[i]) continue; if (cops[i].dead) cops.splice(i, 1); else copStep(cops[i], dt); }
   if (wanted > 0) {
     copLeaveT = 5; copT -= dt; if (copT <= 0 && cops.length < wanted * 2) { spawnCop(); copT = 1.5; }
     calmT = cops.some(c => dist2(c.pos, P.pos) < 60) ? 0 : calmT + dt;

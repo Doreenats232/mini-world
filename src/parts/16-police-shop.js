@@ -27,6 +27,7 @@ function spawnCop() {
 }
 function clearCops() { for (const e of cops) { scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); } cops.length = 0; }
 function copStep(e, dt) {
+  if (stunned(e, dt)) return;
   const T = inCar ? inCar.pos : P.pos, dx = T.x - e.pos.x, dz = T.z - e.pos.z, d = Math.hypot(dx, dz);
   if (d > 160) { e.hp = 0; e.dead = true; scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); return; }
   const sp = 5.8 + wanted * 0.6, mx = d > 7 ? dx / d : 0, mz = d > 7 ? dz / d : 0, ox = e.pos.x, oz = e.pos.z;

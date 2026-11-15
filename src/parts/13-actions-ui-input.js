@@ -19,19 +19,20 @@ function tracer(to) {
 function shoot() {
   if (cool > 0) return; scare(P.pos, 28);
   cam.updateMatrixWorld(); const dm = 1 + 0.25 * up.dmg, sg = weapon === 'shotgun';
-  cool = sg ? 0.7 : 0.25; sfx('shoot'); if (sg) sfx('punch');
+  cool = sg ? 0.7 : 0.25; sfx('shoot'); vmShoot(); if (sg) sfx('punch');
   gun.far = sg ? 30 : 70;
   for (let i = 0; i < (sg ? 7 : 1); i++) {
     gun.setFromCamera({ x: sg ? (Math.random() - 0.5) * 0.14 : 0, y: sg ? (Math.random() - 0.5) * 0.14 : 0 }, cam);
     const h = gun.intersectObjects([...targets, ...enemyMeshes], false)[0];
     tracer(h ? h.point : gun.ray.at(gun.far, new V3()));
+    if (h) spark(h.point, h.object.userData.enemy ? 0xff6a3d : 0xffe9a0);
     if (h && h.object.userData.enemy) damageEnemy(h.object.userData.enemy, (h.object.userData.head ? (sg ? 28 : 60) : (sg ? 14 : 25)) * dm);
   }
 }
 function punch() {
-  if (cool > 0) return; cool = 0.4; sfx('punch');
+  if (cool > 0) return; cool = 0.4; sfx('punch'); vmPunch(); shoveNear();
   const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
-  for (const e of enemies) { if (e.dead) continue; const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d < 2.8 && (dx * fx + dz * fz) / (d || 1) > 0.2) damageEnemy(e, 20); }
+  for (const e of [...enemies, ...cops]) { if (e.dead) continue; const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d < 2.8 && (dx * fx + dz * fz) / (d || 1) > 0.2) damageEnemy(e, 20); }
 }
 const act1 = () => { if (inCar) return; mode === 'fight' ? shoot() : place(); };
 const act2 = () => { if (inCar) return; mode === 'fight' ? punch() : brk(); };

@@ -100,7 +100,7 @@ function setTask(n, t) {
     const cells = rot.cells.map(c => ({ cx: ox + c.x, cy: c.y, cz: oz + c.z, t: c.t, f: c.f, rot: c.rot })).sort((a, b) => (a.f ? 1 : 0) - (b.f ? 1 : 0) || a.cy - b.cy || a.cz - b.cz || a.cx - b.cx);
     reserved.push(new THREE.Box3(new V3(site.x0 * 2 - 2, 0, site.z0 * 2 - 2), new V3((site.x0 + S) * 2 + 2, 60, (site.z0 + S) * 2 + 2)));
     const st = { name: String(t.name || 'Building').slice(0, 30), by: n.name, status: 'building', done: 0, total: cells.length, cells, next: 0, retry: [], town: towns.includes(t._town) ? t._town : null };
-    structures.push(st);
+    structures.push(st); st.x = cxm; st.z = czm;
     n.task = { type: 'build', st, cur: null, stuckSkip: 0 };
     const need = remainingNeed(n.task);
     ev(`${n.name} planned "${st.name}": ${cells.length} blocks (wood ${need.wood}, stone ${need.stone}, sand ${need.sand})`);

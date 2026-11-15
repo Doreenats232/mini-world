@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "dist": "vite build && electron-builder --win --publish never",
-    "test": "node scripts/test.mjs",
+    "test": "node scripts/test.mjs && node scripts/smoke.mjs",
     "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {

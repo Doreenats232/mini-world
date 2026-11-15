@@ -8,15 +8,15 @@ fs.writeFileSync('scripts/.bundle.mjs', src);
 try { execSync('node --check scripts/.bundle.mjs', { stdio: 'pipe' }); ok(true, 'syntax of joined bundle'); } catch (e) { ok(false, 'syntax: ' + String(e.stderr).split('\n').slice(0, 4).join(' | ')); }
 fs.unlinkSync('scripts/.bundle.mjs');
 // 2. pure logic, extracted from the source by function name
-const grab = n => { const i = src.indexOf('function ' + n); if (i < 0) throw new Error('missing function ' + n); return src.slice(i, src.indexOf('\n}\n', i) + 3); };
+const grab = n => { const i = src.indexOf('function ' + n); if (i < 0) throw new Error('missing function ' + n); const eol = src.indexOf('\n', i), line = src.slice(i, eol); if (line.endsWith('}') && line.split('{').length === line.split('}').length) return line + '\n'; return src.slice(i, src.indexOf('\n}\n', i) + 3); };
 const grabConst = n => { const i = src.indexOf('const ' + n + ' ='); if (i < 0) throw new Error('missing const ' + n); return src.slice(i, src.indexOf(';\n', i) + 2); };
 const mod = `import * as THREE from 'three'; import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-const V3 = THREE.Vector3; const CITMAT = new THREE.MeshLambertMaterial({ vertexColors: true }); const BLOCKS = [['planks','wood'],['stone','stone'],['brick','stone'],['glass','sand'],['concrete','stone'],['roof','wood']]; const BIDX = Object.fromEntries(BLOCKS.map((b, i) => [b[0], i]));
+const V3 = THREE.Vector3; const CITMAT = new THREE.MeshLambertMaterial({ vertexColors: true }); const mb = () => new THREE.MeshBasicMaterial(); const CARBODY = mb(), CARGLASS = mb(), CARHEAD = mb(), CARTAIL = mb(), CARBEAM = mb(), CARSHADOW = mb(); const BLOCKS = [['planks','wood'],['stone','stone'],['brick','stone'],['glass','sand'],['concrete','stone'],['roof','wood']]; const BIDX = Object.fromEntries(BLOCKS.map((b, i) => [b[0], i]));
 const CT = 0.8, CG = 4, CDW = 2.4, CDH = 3.0; const m0 = () => new THREE.MeshBasicMaterial(); const FACMAT = [m0(), m0(), m0(), m0()], roofTop = m0(), INTWALL = FACMAT, FLOORMAT = FACMAT, CEILMAT = m0(), FRAMEMAT = m0();
 ${src.slice(src.indexOf('const FURN ='), src.indexOf(';\n', src.indexOf('const FURN =')) + 2)}
 const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
-${grab('expandPlan')}${grab('rotCells')}${grab('genPlan')}${grab('buildShell')}${grab('cbox')}${grab('mkCitizenModel')}${grabConst('nextI')}
-export { expandPlan, rotCells, genPlan, buildShell, FURN, V3, THREE, BLOCKS, mkCitizenModel, nextI };`;
+${grab('expandPlan')}${grab('rotCells')}${grab('genPlan')}${grab('buildShell')}${grab('cbox')}${grab('mkCitizenModel')}${grabConst('nextI')}${grabConst('CAR_TYPES')}CAR_TYPES.taxi = CAR_TYPES.sedan;${grab('cgeo')}${grab('taper')}${grab('mkCarModel')}
+export { mkCarModel, CAR_TYPES, expandPlan, rotCells, genPlan, buildShell, FURN, V3, THREE, BLOCKS, mkCitizenModel, nextI };`;
 fs.writeFileSync('scripts/.logic.mjs', mod);
 const L = await import(pathToFileURL(path.resolve('scripts/.logic.mjs')).href); fs.unlinkSync('scripts/.logic.mjs');
 const { expandPlan, rotCells, genPlan, buildShell, FURN, V3, THREE, mkCitizenModel, nextI } = L, CT = 0.8;
@@ -46,4 +46,5 @@ for (const ry of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
   for (let t = 0; t < 300 && !bad; t++) { const p = (Math.random() - 0.5) * 800, d = Math.random() < 0.5 ? 1 : -1, r = nextI(p, d); if ((((r - 25) % 50) + 50) % 50 !== 0 || (d > 0 ? r <= p : r >= p) || Math.abs(r - p) > 50) bad = `nextI(${p},${d})=${r}`; }
   ok(!bad, 'citizen road navigation nextI always lands on an intersection ahead ' + bad); }
 for (const o of [{ skin: 1, hair: 2, shirt: 3, pants: 4 }, { skin: 1, hair: 2, shirt: 3, pants: 4, hat: 5, glasses: 1, pack: 6, vest: 7, apron: 1, guitar: 1, bag: 8, tool: 1 }]) { const M = mkCitizenModel(o); let meshes = 0; M.g.traverse(m => { if (m.isMesh) meshes++; }); ok(meshes === 5 && M.aL && M.aR && M.lL && M.lR, `citizen model is 5 draw calls (${Object.keys(o).length} options)`); }
+for (const t of Object.keys(L.CAR_TYPES)) for (const dv of [false, true]) { const M = L.mkCarModel(t, 0xd62828, dv); let meshes = 0; M.g.traverse(m => { if (m.isMesh) meshes++; }); ok(M.wheels.length === 4 && M.wheels.filter(w => w.front).length === 2 && meshes <= 12, `car model ${t}${dv ? ' + driver' : ''}: 4 wheels, ${meshes} draw calls`); }
 console.log(fails ? `\n${fails} TEST(S) FAILED` : '\nALL TESTS PASSED'); process.exit(fails ? 1 : 0);

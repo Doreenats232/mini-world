@@ -43,6 +43,7 @@ function sfx(n, v = 1) {
     case 'click': tone(1300, 900, 0.04, 'square', 0.1 * v); break;
     case 'sizzle': noise(0.7, 0.15 * v, 5000, 'highpass'); break;
     case 'note': { const f = [261, 293, 329, 392, 440, 523][Math.floor(Math.random() * 6)]; tone(f, f * 0.99, 0.4, 'triangle', 0.14 * v); break; }
+    case 'horn': tone(430, 430, 0.22, 'square', 0.12 * v); tone(540, 540, 0.22, 'square', 0.09 * v); break;
     case 'step': noise(0.04, 0.1 * v, 450); break;
   }
 }

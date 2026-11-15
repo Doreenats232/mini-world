@@ -26,7 +26,7 @@ function updateSky(dt) {
   sun.position.set(Math.sin(a) * 100, sy * 100 + 5, 30); sun.intensity = 0.05 + 1.15 * day;
   hemi.intensity = 0.28 + 0.82 * day;
   for (const k in matCache) matCache[k].emissiveIntensity = (1 - day) * 1.1;
-  for (const m of FACMAT) m.emissiveIntensity = (1 - day) * 1.1; for (const m of nightMats) m.emissiveIntensity = (1 - day) * 0.5;
+  for (const m of FACMAT) m.emissiveIntensity = (1 - day) * 1.1; CARHEAD.emissiveIntensity = 0.4 + (1 - day) * 1.6; CARTAIL.emissiveIntensity = 0.35 + (1 - day) * 0.9; CARBEAM.opacity = (1 - day) * 0.3; for (const m of nightMats) m.emissiveIntensity = (1 - day) * 0.5;
 }
 setInterval(() => { const h = Math.floor(dayT * 24), m = Math.floor((dayT * 24 - h) * 60); $('ver').textContent = 'v' + VER + ' · ' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }, 1000);
 updateSky(0);
