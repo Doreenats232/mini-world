@@ -10,10 +10,14 @@ const institutions = [];
       used.add(b.id); b.purpose = purpose; b.pname = names[k % names.length]; institutions.push(b); k++;
     }
   };
-  take([...dtn].sort((a, b) => area(b) - area(a)), 'university', 2, 200, ['MLD UNIVERSITY', 'CITY COLLEGE']);
-  take(dtn.filter(b => b.h <= 14 && area(b) >= 100).sort((a, b) => (a.id * 7919 % 101) - (b.id * 7919 % 101)), 'school', 5, 120, ['GREENFIELD PRIMARY', 'SUNRISE SCHOOL', 'HILLTOP ACADEMY', 'ST. MARY SCHOOL', 'RIVERSIDE SCHOOL']);
-  take(dtn.filter(b => b.h >= 30).sort((a, b) => b.h - a.h), 'company', 8, 60, ['MLD TECH CORP', 'OMEGA BANK HQ', 'NOVA ENERGY', 'ATLAS LOGISTICS', 'PIXEL STUDIOS', 'BLUE SKY AIRWAYS', 'TITAN MOTORS', 'HELIX PHARMA']);
+  const PRE = ['Greenfield', 'Sunrise', 'Hilltop', 'St. Mary', 'Riverside', 'Oakwood', 'Maple', 'Lakeview', 'Cedar', 'Bright Future', 'Unity', 'Kingsway', 'Victoria', 'Heritage', 'Golden Star', 'Pearl', 'Rainbow', 'Harmony', 'Pioneer', 'Liberty', 'Eagle', 'Sunny Side', 'Royal', 'Little Stars', 'Hope', 'Wisdom', 'Crescent', 'Palm Grove', 'Northgate', 'Lakeside'], SUF = ['PRIMARY', 'ACADEMY', 'SCHOOL', 'HIGH SCHOOL'];
+  const SN = PRE.map((p, i) => p.toUpperCase() + ' ' + SUF[(i * 7 + 1) % 4]);
+  const CP = ['MLD', 'Omega', 'Nova', 'Atlas', 'Pixel', 'Blue Sky', 'Titan', 'Helix', 'Apex', 'Zenith', 'Orbit', 'Delta', 'Prime', 'Vertex', 'Summit', 'Quantum', 'Falcon', 'Lion', 'Star', 'Metro', 'Crown', 'Vega', 'Aurora', 'Nimbus'], CS = ['TECH CORP', 'BANK HQ', 'ENERGY', 'LOGISTICS', 'STUDIOS', 'AIRWAYS', 'MOTORS', 'PHARMA'];
+  const CN = CP.map((p, i) => p.toUpperCase() + ' ' + CS[(i * 5) % 8]);
+  take([...dtn].sort((a, b) => area(b) - area(a)), 'university', 6, 150, ['MLD UNIVERSITY', 'CITY COLLEGE', 'TECH INSTITUTE', 'ROYAL UNIVERSITY', 'NORTHGATE COLLEGE', 'SAINT PAUL UNIVERSITY']);
   take(buildings.filter(b => b.rich).sort((a, b) => area(b) - area(a)), 'nasa', 1, 0, ['NASA SPACE CENTRE']);
+  take(buildings.filter(b => b.h <= 14 && area(b) >= 90).sort((a, b) => (a.id * 7919 % 101) - (b.id * 7919 % 101)), 'school', 30, 55, SN);
+  take(dtn.filter(b => b.h >= 28).sort((a, b) => b.h - a.h), 'company', 24, 45, CN);
 })();
 const INST_LOOK = { school: ['#e67e22', '#fff', 'SCHOOL'], university: ['#8e44ad', '#fff', 'UNIVERSITY'], company: ['#1f3a5f', '#e8f1ff', 'COMPANY'], nasa: ['#0b1a3a', '#ffffff', 'SPACE RESEARCH'] };
 function signTex(text, sub, bg, fg) {
@@ -53,15 +57,19 @@ for (const b of institutions) {
 }
 // ---- school gates (open for the break and when you walk up; locked when the guard is on alert) ----
 function mkGate(b) {
-  const half = (b.ry === 0 || b.ry === Math.PI) ? b.d / 2 : b.w / 2, g = new THREE.Group(), metal = new THREE.MeshLambertMaterial({ color: 0x22352b }), gold = new THREE.MeshLambertMaterial({ color: 0xc9a227 }), stone = new THREE.MeshLambertMaterial({ color: 0xb9b2a5 });
-  const gx = b.x + Math.sin(b.ry) * (half + 1.2), gz = b.z + Math.cos(b.ry) * (half + 1.2); g.position.set(gx, 0, gz); g.rotation.y = b.ry;
+  const half = (b.ry === 0 || b.ry === Math.PI) ? b.d / 2 : b.w / 2, gx = b.x + Math.sin(b.ry) * (half + 1.2), gz = b.z + Math.cos(b.ry) * (half + 1.2), ew = b.ry === 0 || b.ry === Math.PI, hx = ew ? 3 : 0.25, hz = ew ? 0.25 : 3;
+  b.gate = { g: null, L: null, R: null, key: 'gate' + b.id, box: new THREE.Box3(new V3(gx - hx, 0, gz - hz), new V3(gx + hx, 2.4, gz + hz)), a: 0, solid: false, x: gx, z: gz };
+  b.post = { x: gx + Math.cos(b.ry) * 3.9 + Math.sin(b.ry) * 0.9, z: gz - Math.sin(b.ry) * 3.9 + Math.cos(b.ry) * 0.9 };
+}
+const GMAT = { metal: new THREE.MeshLambertMaterial({ color: 0x22352b }), gold: new THREE.MeshLambertMaterial({ color: 0xc9a227 }), stone: new THREE.MeshLambertMaterial({ color: 0xb9b2a5 }) };
+function buildGate(b) {
+  const gt = b.gate, g = new THREE.Group(), { metal, gold, stone } = GMAT; g.position.set(gt.x, 0, gt.z); g.rotation.y = b.ry;
   const add = (geo, mat, x, y, z, p) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); (p || g).add(m); return m; };
   for (const s of [-1, 1]) { add(new THREE.BoxGeometry(0.5, 2.8, 0.5), stone, s * 3.1, 1.4, 0); add(new THREE.BoxGeometry(0.72, 0.2, 0.72), stone, s * 3.1, 2.9, 0); add(new THREE.SphereGeometry(0.2, 8, 6), gold, s * 3.1, 3.2, 0); }
   const leaf = side => { const p = new THREE.Group(); p.position.set(side * 2.85, 0, 0); for (let i = 0; i < 10; i++) { add(new THREE.BoxGeometry(0.06, 2.0, 0.06), metal, -side * (0.12 + i * 0.28), 1.2, 0, p); add(new THREE.ConeGeometry(0.06, 0.18, 4), gold, -side * (0.12 + i * 0.28), 2.3, 0, p); } add(new THREE.BoxGeometry(2.8, 0.08, 0.08), metal, -side * 1.4, 0.35, 0, p); add(new THREE.BoxGeometry(2.8, 0.08, 0.08), metal, -side * 1.4, 2.0, 0, p); g.add(p); return p; };
-  const ew = b.ry === 0 || b.ry === Math.PI, hx = ew ? 3 : 0.25, hz = ew ? 0.25 : 3;
-  scene.add(g); b.gate = { g, L: leaf(-1), R: leaf(1), key: 'gate' + b.id, box: new THREE.Box3(new V3(gx - hx, 0, gz - hz), new V3(gx + hx, 2.4, gz + hz)), a: 0, solid: false, x: gx, z: gz };
-  b.post = { x: gx + Math.cos(b.ry) * 3.9 + Math.sin(b.ry) * 0.9, z: gz - Math.sin(b.ry) * 3.9 + Math.cos(b.ry) * 0.9 };
+  gt.L = leaf(-1); gt.R = leaf(1); gt.g = g; scene.add(g);
 }
+function dropGate(b) { const gt = b.gate; if (!gt.g) return; scene.remove(gt.g); gt.g.traverse(m => { if (m.geometry) m.geometry.dispose(); }); gt.g = gt.L = gt.R = null; if (gt.solid) { solids.delete(gt.key); gt.solid = false; } }
 for (const b of institutions) if (b.purpose === 'school') mkGate(b);
 function mkBoard(seed) {
   const L = ['2 + 3 = 5', 'A  B  C  D', '1/2 + 1/4 = 3/4', 'The Water Cycle', 'Planets: Mercury, Venus...', 'x + 4 = 9'], txt = L[seed % L.length];

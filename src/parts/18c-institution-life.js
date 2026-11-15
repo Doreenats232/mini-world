@@ -17,7 +17,9 @@ function schoolTick(dt) {
     if (b.purpose !== 'school') continue; const dP = Math.hypot(b.x - P.pos.x, b.z - P.pos.z);
     b.alert = Math.max(0, (b.alert || 0) - dt);
     if (dP < 30 && ph !== 'closed' && ((wanted > 0 && clock - lastCrime < 6) || (mode === 'fight' && (cool > 0 || held)))) b.alert = 25;
+    if (dP > 220 && b.gate.g) dropGate(b);
     if (dP < 130) {
+      if (!b.gate.g) buildGate(b);
       const near = Math.hypot(b.gate.x - P.pos.x, b.gate.z - P.pos.z) < 7, open = !b.alert && ((ph !== 'class' && ph !== 'closed') || near), gt = b.gate;
       gt.a += ((open ? 1 : 0) - gt.a) * Math.min(1, dt * 3); gt.L.rotation.y = -gt.a * 1.4; gt.R.rotation.y = gt.a * 1.4;
       const sol = gt.a < 0.3; if (sol && !gt.solid) { solids.set(gt.key, gt.box); gt.solid = true; } else if (!sol && gt.solid) { solids.delete(gt.key); gt.solid = false; }
