@@ -68,6 +68,7 @@ function mkEnemy(x, z) {
   head.userData.head = true; enemies.push(e); attachSoldier(e, [0xcc5555, 0xa070e0, 0x5599cc, 0xc9a24a][Math.floor(Math.random() * 4)]);
 }
 function spawnEnemy() {
+  if (inSlum(P.pos.x, P.pos.z)) for (let t = 0; t < 6; t++) { const v = Math.random() < 0.5, ln = Math.round((v ? P.pos.x : P.pos.z) / 50 - 0.5) * 50 + 25, a = (v ? P.pos.z : P.pos.x) + (Math.random() - 0.5) * 160, x = v ? ln : a, z = v ? a : ln; if (Math.hypot(x - P.pos.x, z - P.pos.z) < 25 || !inSlum(x, z)) continue; mkEnemy(x, z); return; }
   for (let t = 0; t < 10; t++) {
     const v = Math.random() < 0.5, k = Math.floor(Math.random() * 16) - 8, a = (Math.random() - 0.5) * 600;
     const x = v ? k * 50 + 25 : a, z = v ? a : k * 50 + 25;

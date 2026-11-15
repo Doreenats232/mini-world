@@ -7,7 +7,7 @@ function drawMini() {
   mg.clearRect(0, 0, S, S); mg.save(); mg.beginPath(); mg.arc(c, c, c - 2, 0, 6.2832); mg.clip();
   mg.fillStyle = '#35592b'; mg.fillRect(0, 0, S, S);
   mg.translate(c, c); mg.rotate(yaw); mg.scale(sc, sc); mg.translate(-px, -pz);
-  mg.fillStyle = '#3a3a3d'; for (let k = -8; k <= 7; k++) { mg.fillRect(k * 50 + 18, -400, 14, 800); mg.fillRect(-400, k * 50 + 18, 800, 14); }
+  mg.fillStyle = '#3a3a3d'; for (let k = -13; k <= 11; k++) { mg.fillRect(k * 50 + 18, -650, 14, 1300); mg.fillRect(-650, k * 50 + 18, 1300, 14); }
   mg.fillStyle = '#8a8f98';
   for (const b of cityFoot) { if (Math.abs((b.min.x + b.max.x) / 2 - px) > lim || Math.abs((b.min.z + b.max.z) / 2 - pz) > lim) continue; mg.fillRect(b.min.x, b.min.z, b.max.x - b.min.x, b.max.z - b.min.z); }
   mg.fillStyle = '#d4a85f';
@@ -46,7 +46,7 @@ ren.setAnimationLoop(now => {
   updatePlayerModel(dt);
   if (held && mode === 'fight' && !inCar) shoot();
   for (let i = enemies.length - 1; i >= 0; i--) { if (!enemies[i]) continue; if (enemies[i].dead) enemies.splice(i, 1); else enemyStep(enemies[i], dt); }
-  spawnT -= dt; if (spawnT <= 0 && enemies.length < 10) { spawnEnemy(); spawnT = 3; }
+  spawnT -= dt; if (spawnT <= 0 && enemies.length < (inSlum(P.pos.x, P.pos.z) ? 18 : 10)) { spawnEnemy(); spawnT = 3; }
   for (let i = cops.length - 1; i >= 0; i--) { if (!cops[i]) continue; if (cops[i].dead) cops.splice(i, 1); else copStep(cops[i], dt); }
   if (wanted > 0) {
     copLeaveT = 5; copT -= dt; if (copT <= 0 && cops.length < wanted * 2) { spawnCop(); copT = 1.5; }

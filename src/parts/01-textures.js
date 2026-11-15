@@ -34,7 +34,7 @@ function sideMat(v, wm, hm) {
 }
 const roofTop = new THREE.MeshLambertMaterial({ map: mkTex(64, 64, (g, w, h) => { g.fillStyle = '#6a6c70'; g.fillRect(0, 0, w, h); speck(g, w, h, 500, 'rgba(255,255,255,.1)', 'rgba(0,0,0,.15)'); }) });
 const grassTex = mkTex(256, 256, (g, w, h) => { g.fillStyle = '#4b7d3a'; g.fillRect(0, 0, w, h); for (let i = 0; i < 2500; i++) { g.fillStyle = `hsl(${rr(88, 108)},${rr(35, 50)}%,${rr(26, 40)}%)`; g.fillRect(Math.random() * w, Math.random() * h, 2, 3); } });
-grassTex.repeat.set(175, 175);
+grassTex.repeat.set(300, 300);
 const roadTex = mkTex(128, 256, (g, w, h) => {
   g.fillStyle = '#2e2e31'; g.fillRect(0, 0, w, h); speck(g, w, h, 1500, 'rgba(255,255,255,.07)', 'rgba(0,0,0,.2)');
   g.fillStyle = '#dcdcdc'; g.fillRect(6, 0, 3, h); g.fillRect(w - 9, 0, 3, h);

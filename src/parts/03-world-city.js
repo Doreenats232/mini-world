@@ -4,12 +4,12 @@ const targets = [];
 const blockMeshes = new Map();
 const furn = new Map(), doors = [];
 let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), new THREE.MeshLambertMaterial({ map: grassTex }));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshLambertMaterial({ map: grassTex }));
 ground.rotation.x = -Math.PI / 2; scene.add(ground); targets.push(ground);
 const roadMat = new THREE.MeshLambertMaterial({ map: roadTex });
-for (let k = -8; k <= 7; k++) {
-  const a = new THREE.Mesh(new THREE.PlaneGeometry(14, 800), roadMat); a.rotation.x = -Math.PI / 2; a.position.set(k * 50 + 25, 0.03, 0); scene.add(a);
-  const gr = new THREE.Group(), b = new THREE.Mesh(new THREE.PlaneGeometry(14, 800), roadMat); b.rotation.x = -Math.PI / 2; gr.add(b); gr.rotation.y = Math.PI / 2; gr.position.set(0, 0.035, k * 50 + 25); scene.add(gr);
+for (let k = -13; k <= 11; k++) {
+  const a = new THREE.Mesh(new THREE.PlaneGeometry(14, 1300), roadMat); a.rotation.x = -Math.PI / 2; a.position.set(k * 50 + 25, 0.03, 0); scene.add(a);
+  const gr = new THREE.Group(), b = new THREE.Mesh(new THREE.PlaneGeometry(14, 1300), roadMat); b.rotation.x = -Math.PI / 2; gr.add(b); gr.rotation.y = Math.PI / 2; gr.position.set(0, 0.035, k * 50 + 25); scene.add(gr);
 }
 // ---- enterable city: hollow shells with a door, merged into one mesh per building ----
 const buildings = [], cityFoot = [];
@@ -57,5 +57,34 @@ for (let i = -7; i <= 6; i++) for (let j = -7; j <= 6; j++) {
     cityFoot.push(new THREE.Box3(new V3(x - w / 2, 0, z - d / 2), new V3(x + w / 2, h, z + d / 2)));
   }
 }
+
+// ---- bigger city: rich east side, slums on the west side, around the old downtown ----
+function addCityBuilding(x, z, w, d, h, v) {
+  const rx = Math.round((x - 25) / 50) * 50 + 25, rz = Math.round((z - 25) / 50) * 50 + 25;
+  const dX = rx > x ? rx - (x + w / 2) : (x - w / 2) - rx, dZ = rz > z ? rz - (z + d / 2) : (z - d / 2) - rz;
+  const id = buildings.length, ry = dX < dZ ? (rx > x ? Math.PI / 2 : -Math.PI / 2) : (rz > z ? 0 : Math.PI);
+  const b = { id, x, z, w, d, h, v, iv: id % 4, fv: (id >> 2) % 2, ry, on: false, int: null };
+  const sh = buildShell(b); scene.add(sh.mesh); targets.push(sh.mesh); b.boxes = sh.boxes; buildings.push(b);
+  cityFoot.push(new THREE.Box3(new V3(x - w / 2, 0, z - d / 2), new V3(x + w / 2, h, z + d / 2)));
+  return b;
+}
+for (let i = -12; i <= 11; i++) for (let j = -12; j <= 11; j++) {
+  if (i >= -7 && i <= 6 && j >= -7 && j <= 6) continue;
+  const rich = i > 0, n = rich ? 1 + Math.floor(rnd() * 2) : 2 + Math.floor(rnd() * 2), placed = [];
+  for (let q = 0; q < n; q++) {
+    const w = rich ? 11 + rnd() * 6 : 6 + rnd() * 4, d = rich ? 11 + rnd() * 6 : 6 + rnd() * 4, h = rich ? 5 + rnd() * 6 : 4 + rnd() * 5, v = Math.floor(rnd() * 4);
+    const sp = rich ? 12 : 16, x = i * 50 + (rnd() - 0.5) * sp, z = j * 50 + (rnd() - 0.5) * sp;
+    if (placed.some(o => Math.abs(o.x - x) < (o.w + w) / 2 + 2 && Math.abs(o.z - z) < (o.d + d) / 2 + 2)) continue;
+    placed.push({ x, z, w, d }); const b = addCityBuilding(x, z, w, d, h, v); b.rich = rich; b.slum = !rich;
+  }
+}
+// ground tint: lush lawns on the rich side, dirt on the slum side
+function tintZone(x0, x1, z0, z1, col) {
+  const t = grassTex.clone(); t.needsUpdate = true; t.repeat.set((x1 - x0) / 8, (z1 - z0) / 8);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), new THREE.MeshLambertMaterial({ map: t, color: col }));
+  m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, 0.012, (z0 + z1) / 2); scene.add(m);
+}
+tintZone(330, 650, -650, 650, 0xa8e090); tintZone(0, 330, -650, -360, 0xa8e090); tintZone(0, 330, 330, 650, 0xa8e090);
+tintZone(-650, -360, -650, 650, 0xb8a07a); tintZone(-360, 0, -650, -360, 0xb8a07a); tintZone(-360, 0, 330, 650, 0xb8a07a);
 const onRoad = (x, z, m = 8.5) => { const a = ((x - 25) % 50 + 50) % 50, b = ((z - 25) % 50 + 50) % 50; return a < m || a > 50 - m || b < m || b > 50 - m; };
 

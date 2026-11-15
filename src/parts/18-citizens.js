@@ -86,10 +86,10 @@ function roadSpot() {
   for (let t = 0; t < 8; t++) {
     const axis = Math.random() < 0.5 ? 'x' : 'z', other = axis === 'x' ? P.pos.z : P.pos.x, along = axis === 'x' ? P.pos.x : P.pos.z;
     const line = Math.round((other - 25) / 50 + (Math.floor(Math.random() * 3) - 1)) * 50 + 25;
-    if (line < -375 || line > 325) continue;
+    if (line < WB.lo || line > WB.hi) continue;
     const a = along + (Math.random() < 0.5 ? -1 : 1) * (35 + Math.random() * 55), lane = Math.random() < 0.5 ? -5.5 : 5.5;
     const x = axis === 'x' ? a : line + lane, z = axis === 'x' ? line + lane : a;
-    if (x < -380 || x > 330 || z < -380 || z > 330 || Math.hypot(x - P.pos.x, z - P.pos.z) < 30) continue;
+    if (x < WB.lim0 || x > WB.lim1 || z < WB.lim0 || z > WB.lim1 || Math.hypot(x - P.pos.x, z - P.pos.z) < 30) continue;
     return { axis, line, lane, x, z };
   }
   return null;
@@ -164,7 +164,7 @@ function roadStep(c, dt, sp) {
   if ((c.pos[a] - c.nextI) * c.dir >= 0) {
     const here = c.nextI;
     if (Math.random() < 0.45) { c.axis = l; c.line = here; c.dir = Math.random() < 0.5 ? 1 : -1; c.lane = Math.random() < 0.5 ? -5.5 : 5.5; }
-    const na = c.axis; let nx = nextI(c.pos[na], c.dir); if (nx < -375 || nx > 325) { c.dir = -c.dir; nx = nextI(c.pos[na], c.dir); } c.nextI = nx;
+    const na = c.axis; let nx = nextI(c.pos[na], c.dir); if (nx < WB.lo || nx > WB.hi) { c.dir = -c.dir; nx = nextI(c.pos[na], c.dir); } c.nextI = nx;
   }
 }
 function nearestDoor(pos, r) { let bb = null, bd = r; for (const b of buildings) { const d = Math.hypot(b.x - pos.x, b.z - pos.z) - Math.max(b.w, b.d) / 2; if (d < bd) { bd = d; bb = b; } } return bb; }

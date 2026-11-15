@@ -17,3 +17,7 @@ const V3 = THREE.Vector3;
 const net = { on: false, host: false, client: false, peer: null, conns: [], hostConn: null, myId: null, code: '', remotes: new Map(), applying: false, noSave: false, names: [], name: 'Player' + Math.floor(Math.random() * 900 + 100) };
 try { const n = localStorage.getItem('mw_name'); if (n) net.name = n; } catch (e) {}
 
+
+// city bounds (roads lines 50k+25). Old downtown = blocks -7..6; new ring out to blocks -12..11
+const WB = { lo: -625, hi: 575, lim0: -630, lim1: 580 };
+const inSlum = (x, z) => x < 0 && (x < -360 || z < -360 || z > 330), inRich = (x, z) => x > 0 && (x > 330 || z < -360 || z > 330);

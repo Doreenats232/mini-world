@@ -4,10 +4,10 @@ const TCOL = [0xd62828, 0x2a6fdb, 0xf4f4f4, 0x222222, 0xe9c46a, 0x2a9d8f, 0x8d99
 function carSpot() {
   for (let t = 0; t < 8; t++) {
     const axis = Math.random() < 0.5 ? 'x' : 'z', other = axis === 'x' ? P.pos.z : P.pos.x, along = axis === 'x' ? P.pos.x : P.pos.z;
-    const line = Math.round((other - 25) / 50 + (Math.floor(Math.random() * 3) - 1)) * 50 + 25; if (line < -375 || line > 325) continue;
+    const line = Math.round((other - 25) / 50 + (Math.floor(Math.random() * 3) - 1)) * 50 + 25; if (line < WB.lo || line > WB.hi) continue;
     const dir = Math.random() < 0.5 ? 1 : -1, a = along + (Math.random() < 0.5 ? -1 : 1) * (45 + Math.random() * 55), lat = line + (axis === 'x' ? dir : -dir) * 3;
     const x = axis === 'x' ? a : lat, z = axis === 'x' ? lat : a;
-    if (x < -380 || x > 330 || z < -380 || z > 330 || Math.hypot(x - P.pos.x, z - P.pos.z) < 40 || cars.some(o => Math.hypot(o.pos.x - x, o.pos.z - z) < 8)) continue;
+    if (x < WB.lim0 || x > WB.lim1 || z < WB.lim0 || z > WB.lim1 || Math.hypot(x - P.pos.x, z - P.pos.z) < 40 || cars.some(o => Math.hypot(o.pos.x - x, o.pos.z - z) < 8)) continue;
     return { axis, line, dir, x, z, h: axis === 'x' ? Math.atan2(dir, 0) : Math.atan2(0, dir) };
   }
   return null;

@@ -15,7 +15,7 @@ if (!process.env.SMOKE_FRESH) { W.localStorage.setItem('mw_save', JSON.stringify
 class FakeRenderer { constructor() { this.domElement = W.document.createElement('canvas'); this.domElement.requestPointerLock = () => {}; } setSize() {} setPixelRatio() {} setAnimationLoop(f) { globalThis.__loop = f; } render() {} }
 class FakePeer { on() {} }
 const T = { ...THREE, WebGLRenderer: FakeRenderer };
-const API = 'P, cars, citizens, enemies, npcs, cops, buildings, structures, shoot, punch, toggleCar, tryUse, tryTalk, spawnJob, spawnInterior, updateCity, startTown, addBlock, addFurniture, spawnTrafficCar, getInCar: () => inCar, setTpv: v => { tpv = v; }, popTire, debris, setSoldier: v => { SOLDIER = v; }, mkCop, damageCar, explodeCar, smokes, mkFerrariModel, setFerrari: v => { FERRARI = v; }, net, hostData, netTick, mkBike, keys, crime, damageEnemy, mkEnemy, playerSay, JW, doors, useables, mkCar, setMode: v => { mode = v; }, getWanted: () => wanted, getMode: () => mode';
+const API = 'P, inSlum, inRich, cars, citizens, enemies, npcs, cops, buildings, structures, shoot, punch, toggleCar, tryUse, tryTalk, spawnJob, spawnInterior, updateCity, startTown, addBlock, addFurniture, spawnTrafficCar, getInCar: () => inCar, setTpv: v => { tpv = v; }, popTire, debris, setSoldier: v => { SOLDIER = v; }, mkCop, damageCar, explodeCar, smokes, mkFerrariModel, setFerrari: v => { FERRARI = v; }, net, hostData, netTick, mkBike, keys, crime, damageEnemy, mkEnemy, playerSay, JW, doors, useables, mkCar, setMode: v => { mode = v; }, getWanted: () => wanted, getMode: () => mode';
 let api, fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok  ', m); };
 try { api = new Function('THREE', 'mergeGeometries', 'GLTFLoader', 'SkeletonUtils', 'Peer', `'use strict';\n${src}\n;return { ${API} };`)(T, mergeGeometries, GLTFLoader, SkeletonUtils, FakePeer); ok(true, 'game boots' + (process.env.SMOKE_FRESH ? ' on a fresh world' : ' and restores a saved world (blocks, furniture, doors, fixtures)')); }
 catch (e) { ok(false, 'BOOT FAILED: ' + e.stack.split('\n').slice(0, 4).join(' | ')); process.exit(1); }
@@ -52,4 +52,10 @@ step('enter a city building: interior spawns, fixtures usable', () => { const b 
 step('NPC town founding + 20s of building', () => { P.pos.set(25, 0, 25); api.startTown('Smoke', null, 'small'); frames(1200); });
 step('chat falls back gracefully', () => { api.playerSay('hello'); api.playerSay('Archie, follow me'); frames(30); });
 step('day/night cycle keeps running', () => frames(2000));
+step('bigger city: rich + slum districts exist, slums fill with thugs, far traffic/citizens run', () => {
+  if (!api.buildings.some(b => b.rich) || !api.buildings.some(b => b.slum)) throw new Error('no rich/slum buildings');
+  api.P.pos.set(-500, 0, -25); api.updateCity(); frames(1500); if (!api.inSlum(-500, -25) || api.inRich(-500, -25)) throw new Error('zone check');
+  if (api.enemies.filter(e => !e.dead).length < 3) throw new Error('slum has too few thugs');
+  api.P.pos.set(500, 0, 25); api.updateCity(); frames(600); api.P.pos.set(0, 0, 0); frames(60);
+});
 console.log(fails ? `\n${fails} SMOKE CHECK(S) FAILED` : '\nSMOKE TEST PASSED'); process.exit(fails ? 1 : 0);
