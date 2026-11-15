@@ -8,12 +8,14 @@ function mkCar(x, z, h, col, owned = false, type, ai = false) {
 mkCar(25, 45, 0, 0xd62828); mkCar(45, 25, Math.PI / 2, 0x2a9d8f); mkCar(-25, -5, 0, 0xf4a261); mkCar(75, -25, Math.PI / 2, 0x6a4c93);
 mkBike(30, 33, 0.6); mkBike(18, 12, -0.8); mkBike(-20, 8, 2.2);
 function toggleCar() {
+  if (enter) return;
   if (!inCar && shopNear()) { openShop(); return; }
   if (!inCar && tryUse()) return;
   if (!inCar && tryTalk()) return;
   if (inCar) { const c = inCar; inCar = null; c.speed = 0; c.doorT = 1.3; if (c.rider) c.rider.visible = false; stopEngine(); P.pos.set(c.pos.x + Math.cos(c.h) * 3, 0, c.pos.z - Math.sin(c.h) * 3); P.vel.set(0, 0, 0); P.yaw = c.h + Math.PI; P.pitch = 0; return; }
   let best = null, bd = 5;
   for (const c of cars) { if (c.dead) continue; const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; best = c; } }
+  if (best && tpv && !enterGo) { startEnter(best); return; }
   if (best) { inCar = best; best.doorT = 1.2; if (best.bike) { best.rider.visible = true; msg('Bike: W/S pedal, A/D steer, Space brake, E hop off', 2500); } else startEngine(); if (best.ai) { best.ai = null; msg('Carjacked!', 1500); } if (!best.bike && !best.owned && !best.stolen) { best.stolen = true; crime(1, 'car theft'); } if (!best.bike) msg('W/S drive, A/D steer, Space brake, E exit', 2500); } else msg('No car nearby', 900);
 }
 function driveCar(dt) {

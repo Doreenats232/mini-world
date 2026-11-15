@@ -2,10 +2,10 @@
 let SOLDIER = null;
 try { new GLTFLoader().load('models/soldier.glb', gl => { SOLDIER = { scene: gl.scene, animations: gl.animations }; }, undefined, () => {}); } catch (e) {}
 function makeSoldier(tint, scale = 1) {
-  const root = SkeletonUtils.clone(SOLDIER.scene); root.scale.setScalar(scale);
+  const root = SkeletonUtils.clone(SOLDIER.scene), wrap = new THREE.Group(); root.scale.setScalar(scale); root.rotation.y = Math.PI; wrap.add(root);
   root.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); if (tint != null) o.material.color.set(tint); o.frustumCulled = false; } });
   const mixer = new THREE.AnimationMixer(root), act = {}; for (const c of SOLDIER.animations) act[c.name] = mixer.clipAction(c);
-  const s = { root, mixer, act, cur: null, last: null }; soldAnim(s, 'Idle'); return s;
+  const s = { root: wrap, mixer, act, cur: null, last: null }; soldAnim(s, 'Idle'); return s;
 }
 function soldAnim(s, name) {
   if (s.cur === name) return; const a = s.act[name]; if (!a) return;

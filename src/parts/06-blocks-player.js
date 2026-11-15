@@ -61,7 +61,7 @@ function playerStep(dt) {
   phys(P, mx * sp, mz * sp, dt);
   if (P.ground && (mx || mz)) { stepT -= dt; if (stepT <= 0) { sfx('step'); stepT = keys.ShiftLeft ? 0.28 : 0.42; } }
   if (P.pos.y < -50) P.pos.set(25, 3, 25);
-  cam.position.set(P.pos.x, P.pos.y + 1.55, P.pos.z); cam.rotation.set(P.pitch, P.yaw, 0);
+  if (tpv) tpCamera(); else { cam.position.set(P.pos.x, P.pos.y + 1.55, P.pos.z); cam.rotation.set(P.pitch, P.yaw, 0); }
   if (P.hp < maxHp() && clock - lastHurt > 5) { P.hp = Math.min(maxHp(), P.hp + 3 * dt); hud(); }
 }
 

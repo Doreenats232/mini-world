@@ -42,7 +42,8 @@ ren.setAnimationLoop(now => {
   updateSky(dt); updateUse(dt); updateCitizens(dt); updateTraffic(dt); updateViewmodel(dt); updateFx(dt); updateCarFx(dt); updateSoldiers(dt);
   { const pre = isTouch ? 'Tap CAR: ' : 'Press E: '; let ht = ''; if (!inCar && !shopOpen) { if (shopNear()) ht = pre + 'open shop'; else { const u = nearestUse(); if (u) ht = pre + USEN[u.f]; else { const cz = nearestCitizen(); if (cz) ht = pre + 'talk to ' + cz.name + ' (' + cz.job + ')'; } } } if (ht !== hintTxt) { hintTxt = ht; $('hint').textContent = ht; $('hint').style.display = ht ? 'block' : 'none'; } }
   miniT -= dt; if (miniT <= 0) { miniT = 0.066; drawMini(); }
-  if (inCar) driveCar(dt); else playerStep(dt);
+  if (inCar) driveCar(dt); else if (enter) updateEnter(dt); else playerStep(dt);
+  updatePlayerModel(dt);
   if (held && mode === 'fight' && !inCar) shoot();
   for (let i = enemies.length - 1; i >= 0; i--) { if (!enemies[i]) continue; if (enemies[i].dead) enemies.splice(i, 1); else enemyStep(enemies[i], dt); }
   spawnT -= dt; if (spawnT <= 0 && enemies.length < 10) { spawnEnemy(); spawnT = 3; }

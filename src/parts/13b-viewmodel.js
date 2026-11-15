@@ -14,7 +14,7 @@ scene.add(cam); cam.add(VM.g);
 function vmShoot() { VM.kick = 1; VM.flash = 0.06; }
 function vmPunch() { VM.punchT = 0.3; VM.hand = 1 - VM.hand; }
 function updateViewmodel(dt) {
-  VM.g.visible = !inCar && !shopOpen; if (!VM.g.visible) return;
+  VM.g.visible = !inCar && !shopOpen && !tpv; if (!VM.g.visible) return;
   const fight = mode === 'fight', sg = weapon === 'shotgun';
   vmPistol.visible = fight && !sg; vmShotgun.visible = fight && sg; vmBlock.visible = !fight; vmBlock.material = vmBlockMats[sel];
   const moving = P.ground && (keys.KeyW || keys.KeyS || keys.KeyA || keys.KeyD || Math.abs(joy.x) + Math.abs(joy.y) > 0.25);

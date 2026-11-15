@@ -76,6 +76,7 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.code === 'Space') { if (!inCar) jump(); e.preventDefault(); }
   if (e.code === 'KeyQ') toggleMode();
+  if (e.code === 'KeyV') toggleView();
   if (e.code === 'KeyM') toggleMute();
   if (e.code === 'KeyR') swapWeapon();
   if (e.code === 'KeyE') toggleCar();
@@ -97,7 +98,7 @@ if (!isTouch) {
 // ---------- input: touch ----------
 const tch = {};
 function btn(id, fn) { $(id).addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); fn(); }, { passive: false }); }
-btn('jump', () => { if (!inCar) jump(); }); btn('place', act1); btn('brk', act2); btn('col', colAct); btn('mode', toggleMode); btn('car', toggleCar); btn('chatbtn', openChat);
+btn('jump', () => { if (!inCar) jump(); }); btn('place', act1); btn('brk', act2); btn('col', colAct); btn('mode', toggleMode); btn('car', toggleCar); btn('cam', toggleView); btn('chatbtn', openChat);
 const uiTarget = t => t.closest && t.closest('#chatbar,#panel,#shop,#mp,#mpbtn,#gear,#mute,.b');
 addEventListener('touchstart', e => { for (const t of e.changedTouches) { if (uiTarget(t.target)) continue; tch[t.identifier] = { x: t.clientX, y: t.clientY, mode: t.clientX < innerWidth / 2 ? 'joy' : 'look' }; } }, { passive: false });
 addEventListener('touchmove', e => {
