@@ -53,3 +53,28 @@ function animCar(c, dt, steer, thr) {
   for (const w of c.wheels) { w.spin.rotation.x = c.spin; if (w.front) w.pivot.rotation.y = Math.max(-0.5, Math.min(0.5, c.steerV * 0.45)); }
   const k = Math.min(1, dt * 5); c.body.rotation.x += (-(thr || 0) * 0.02 - c.body.rotation.x) * k; c.body.rotation.z += (-c.steerV * Math.min(1, Math.abs(c.speed) / 15) * 0.05 - c.body.rotation.z) * k;
 }
+
+// ---------- rideable bike ----------
+function mkBikeModel(col) {
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const M = c => new THREE.MeshLambertMaterial({ color: c }), bx = (w, h, d, x, y, z, c, p = body) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M(c)); m.position.set(x, y, z); p.add(m); return m; };
+  const wheels = [];
+  for (const [z, front] of [[0.6, true], [-0.6, false]]) {
+    const pivot = new THREE.Group(), spin = new THREE.Group(), geo = new THREE.CylinderGeometry(0.36, 0.36, 0.07, 14); geo.rotateZ(Math.PI / 2);
+    spin.add(new THREE.Mesh(geo, M(0x1a1a1a))); spin.add(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.62, 0.05), M(0xbbbbbb)));
+    pivot.position.set(0, 0.36, z); pivot.add(spin); g.add(pivot); wheels.push({ pivot, spin, front });
+  }
+  bx(0.06, 0.06, 1.05, 0, 0.66, 0, col); bx(0.06, 0.42, 0.06, 0, 0.5, 0.5, col); bx(0.5, 0.05, 0.05, 0, 0.98, 0.52, 0x333333); bx(0.12, 0.05, 0.3, 0, 0.88, -0.22, 0x222222);
+  // rider (blocky, matches the other humans)
+  const R = new THREE.Group(); body.add(R);
+  bx(0.34, 0.5, 0.3, 0, 1.25, -0.15, 0x2c3e50, R); bx(0.28, 0.28, 0.28, 0, 1.68, -0.08, 0xe0b48f, R); bx(0.3, 0.1, 0.3, 0, 1.84, -0.08, 0xff4d4d, R);
+  bx(0.12, 0.5, 0.14, 0.12, 0.75, -0.05, 0x333344, R); bx(0.12, 0.5, 0.14, -0.12, 0.75, -0.05, 0x333344, R);
+  bx(0.1, 0.1, 0.5, 0.2, 1.1, 0.3, 0xe0b48f, R); bx(0.1, 0.1, 0.5, -0.2, 1.1, 0.3, 0xe0b48f, R);
+  R.visible = false;
+  return { g, body, wheels, wr: 0.36, rider: R };
+}
+function mkBike(x, z, h) {
+  const M = mkBikeModel([0xd62828, 0x2a9d8f, 0xf1c40f, 0x4dabf7][Math.floor(Math.random() * 4)]);
+  M.g.position.set(x, 0, z); M.g.rotation.y = h; scene.add(M.g);
+  const c = { mesh: M.g, body: M.body, wheels: M.wheels, wr: M.wr, rider: M.rider, pos: new V3(x, 0, z), h, speed: 0, owned: true, bike: true, type: 'bike', spin: 0, steerV: 0, ai: null }; cars.push(c); return c;
+}

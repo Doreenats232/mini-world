@@ -71,6 +71,14 @@ function spawnCarNearby() {
   }
   return false;
 }
+function spawnBikeNearby() {
+  for (const a of [0, 1.57, -1.57, 3.14]) {
+    const x = P.pos.x - Math.sin(P.yaw + a) * 3, z = P.pos.z - Math.cos(P.yaw + a) * 3, t = { pos: new V3(x, 0, z), R: 1, H: 1.2 };
+    let bad = false; for (const b of solids.values()) if (hit(t, b)) { bad = true; break; }
+    if (!bad) { mkBike(x, z, P.yaw + a + Math.PI / 2); return true; }
+  }
+  return false;
+}
 function swapWeapon() { if (!hasShotgun) { msg('Buy the shotgun at the shop', 1500); return; } weapon = weapon === 'pistol' ? 'shotgun' : 'pistol'; hud(); }
 function colAct() { if (mode === 'fight') swapWeapon(); else selBlock(sel + 1); }
 const ITEMS = [
@@ -80,6 +88,7 @@ const ITEMS = [
   { name: 'Run speed +15%', desc: () => 'Level ' + up.spd + '/2', cost: () => 150 + 100 * up.spd, can: () => up.spd < 2, buy: () => { up.spd++; } },
   { name: 'Shotgun', desc: 'Press R (or GUN button) in fight mode', cost: () => 300, can: () => !hasShotgun, buy: () => { hasShotgun = true; weapon = 'shotgun'; } },
   { name: 'Supplies for NPCs', desc: '+40 wood, +30 stone, +15 sand each', cost: () => 120, can: () => true, buy: () => { for (const n of npcs) { n.inv.wood = Math.min(60, n.inv.wood + 40); n.inv.stone = Math.min(60, n.inv.stone + 30); n.inv.sand = Math.min(60, n.inv.sand + 15); } ev('You gave the crew supplies from the shop'); } },
+  { name: 'New bike', desc: 'Delivered next to you', cost: () => 40, can: () => true, buy: () => spawnBikeNearby() },
   { name: 'New car', desc: 'Delivered next to you', cost: () => 200, can: () => true, buy: () => spawnCarNearby() },
 ];
 function renderShop() {

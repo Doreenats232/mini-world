@@ -15,7 +15,7 @@ if (!process.env.SMOKE_FRESH) { W.localStorage.setItem('mw_save', JSON.stringify
 class FakeRenderer { constructor() { this.domElement = W.document.createElement('canvas'); this.domElement.requestPointerLock = () => {}; } setSize() {} setPixelRatio() {} setAnimationLoop(f) { globalThis.__loop = f; } render() {} }
 class FakePeer { on() {} }
 const T = { ...THREE, WebGLRenderer: FakeRenderer };
-const API = 'P, cars, citizens, enemies, npcs, cops, buildings, structures, shoot, punch, toggleCar, tryUse, tryTalk, spawnJob, spawnInterior, updateCity, startTown, addBlock, addFurniture, spawnTrafficCar, crime, damageEnemy, mkEnemy, playerSay, JW, doors, useables, mkCar, setMode: v => { mode = v; }, getWanted: () => wanted, getMode: () => mode';
+const API = 'P, cars, citizens, enemies, npcs, cops, buildings, structures, shoot, punch, toggleCar, tryUse, tryTalk, spawnJob, spawnInterior, updateCity, startTown, addBlock, addFurniture, spawnTrafficCar, mkBike, keys, crime, damageEnemy, mkEnemy, playerSay, JW, doors, useables, mkCar, setMode: v => { mode = v; }, getWanted: () => wanted, getMode: () => mode';
 let api, fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok  ', m); };
 try { api = new Function('THREE', 'mergeGeometries', 'Peer', `'use strict';\n${src}\n;return { ${API} };`)(T, mergeGeometries, FakePeer); ok(true, 'game boots' + (process.env.SMOKE_FRESH ? ' on a fresh world' : ' and restores a saved world (blocks, furniture, doors, fixtures)')); }
 catch (e) { ok(false, 'BOOT FAILED: ' + e.stack.split('\n').slice(0, 4).join(' | ')); process.exit(1); }
@@ -31,6 +31,7 @@ step('shoving a citizen causes assault + wanted + police', () => { api.spawnJob(
 step('police chase (wanted level 3)', () => { api.crime(3, 'test'); if (api.getWanted() < 1) throw new Error('wanted not set'); frames(400); });
 step('traffic spawns and drives', () => { for (let i = 0; i < 6; i++) api.spawnTrafficCar(); frames(400); });
 step('carjack + drive + exit', () => { const c = api.cars.find(x => x.ai) || api.cars[0]; P.pos.set(c.pos.x + 2, 0, c.pos.z); frames(2); api.toggleCar(); frames(120); api.toggleCar(); frames(30); });
+step('ride a bike: mount, pedal, steer, brake, hop off', () => { P.pos.set(500, 0, 500); for (const c of api.citizens) c.pos.set(-500, 0, -500); const b = api.mkBike(501, 500, 0); frames(2); api.toggleCar(); frames(2); if (!b.rider.visible) throw new Error('not mounted'); for (const k of ['KeyW', 'KeyA', 'Space']) { api.keys[k] = true; frames(40); api.keys[k] = false; } frames(200); api.toggleCar(); frames(5); if (b.rider.visible) throw new Error('still mounted'); });
 step('enter a city building: interior spawns, fixtures usable', () => { const b = api.buildings[5]; P.pos.set(b.x, 0.5, b.z); frames(30); api.updateCity(); frames(10); api.useables.forEach(u => { P.pos.set(u.grp.position.x, 0, u.grp.position.z + 1); api.tryUse(); }); frames(30); if (!b.int) throw new Error('interior not spawned'); });
 step('NPC town founding + 20s of building', () => { P.pos.set(25, 0, 25); api.startTown('Smoke', null, 'small'); frames(1200); });
 step('chat falls back gracefully', () => { api.playerSay('hello'); api.playerSay('Archie, follow me'); frames(30); });
