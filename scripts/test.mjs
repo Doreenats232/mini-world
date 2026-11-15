@@ -12,7 +12,7 @@ const grab = n => { const i = src.indexOf('function ' + n); if (i < 0) throw new
 const grabConst = n => { const i = src.indexOf('const ' + n + ' ='); if (i < 0) throw new Error('missing const ' + n); return src.slice(i, src.indexOf(';\n', i) + 2); };
 const mod = `import * as THREE from 'three'; import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 const V3 = THREE.Vector3; const CITMAT = new THREE.MeshLambertMaterial({ vertexColors: true }); const mb = () => new THREE.MeshBasicMaterial(); const CARBODY = mb(), CARGLASS = mb(), CARHEAD = mb(), CARTAIL = mb(), CARBEAM = mb(), CARSHADOW = mb(); const BLOCKS = [['planks','wood'],['stone','stone'],['brick','stone'],['glass','sand'],['concrete','stone'],['roof','wood']]; const BIDX = Object.fromEntries(BLOCKS.map((b, i) => [b[0], i]));
-const CT = 0.8, CG = 4, CDW = 2.4, CDH = 3.0; const m0 = () => new THREE.MeshBasicMaterial(); const FACMAT = [m0(), m0(), m0(), m0()], roofTop = m0(), INTWALL = FACMAT, FLOORMAT = FACMAT, CEILMAT = m0(), FRAMEMAT = m0();
+let FERRARI = null; const mkFerrariModel = () => null; const CT = 0.8, CG = 4, CDW = 2.4, CDH = 3.0; const m0 = () => new THREE.MeshBasicMaterial(); const FACMAT = [m0(), m0(), m0(), m0()], roofTop = m0(), INTWALL = FACMAT, FLOORMAT = FACMAT, CEILMAT = m0(), FRAMEMAT = m0();
 ${src.slice(src.indexOf('const FURN ='), src.indexOf(';\n', src.indexOf('const FURN =')) + 2)}
 const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 ${grab('expandPlan')}${grab('rotCells')}${grab('genPlan')}${grab('buildShell')}${grab('cbox')}${grab('mkCitizenModel')}${grabConst('nextI')}${grabConst('CAR_TYPES')}CAR_TYPES.taxi = CAR_TYPES.sedan;${grab('cgeo')}${grab('taper')}${grab('mkCarModel')}

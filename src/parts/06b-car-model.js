@@ -19,6 +19,7 @@ function cgeo(g, x, y, z, col) {
 }
 function taper(w, h, d, tx, tz) { const g = new THREE.BoxGeometry(w, h, d), p = g.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) > 0) { p.setX(i, p.getX(i) * tx); p.setZ(i, p.getZ(i) * tz); } g.computeVertexNormals(); return g; }
 function mkCarModel(typeName, col, driver) {
+  if (typeName === 'sport' && FERRARI) return mkFerrariModel(col);
   const T = CAR_TYPES[typeName] || CAR_TYPES.sedan, L = T.L, W = T.W, wr = T.wr, y0 = wr * 0.85, bh = T.bodyH;
   const body = [], glass = [], head = [], tail = [], g = new THREE.Group(), bodyG = new THREE.Group(), B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
   body.push(cgeo(B(W, bh, L), 0, y0 + bh / 2, 0, col));

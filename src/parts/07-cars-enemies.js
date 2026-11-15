@@ -3,7 +3,7 @@ const cars = [];
 function mkCar(x, z, h, col, owned = false, type, ai = false) {
   const t = type || ['sedan', 'hatch', 'suv', 'sport', 'taxi'][Math.floor(Math.random() * 5)], M = mkCarModel(t, t === 'taxi' ? 0xf5c518 : col, ai), g = M.g;
   g.position.set(x, 0, z); g.rotation.y = h; scene.add(g);
-  const car = { mesh: g, body: M.body, wheels: M.wheels, wr: M.wr, pos: new V3(x, 0, z), h, speed: 0, owned, type: t, spin: 0, steerV: 0, ai: ai ? {} : null }; cars.push(car); return car;
+  const car = { mesh: g, body: M.body, wheels: M.wheels, wr: M.wr, pos: new V3(x, 0, z), h, speed: 0, owned, type: t, spin: 0, steerV: 0, ai: ai ? {} : null }; initCarDamage(car); cars.push(car); return car;
 }
 mkCar(25, 45, 0, 0xd62828); mkCar(45, 25, Math.PI / 2, 0x2a9d8f); mkCar(-25, -5, 0, 0xf4a261); mkCar(75, -25, Math.PI / 2, 0x6a4c93);
 mkBike(30, 33, 0.6); mkBike(18, 12, -0.8); mkBike(-20, 8, 2.2);
@@ -13,7 +13,7 @@ function toggleCar() {
   if (!inCar && tryTalk()) return;
   if (inCar) { const c = inCar; inCar = null; c.speed = 0; if (c.rider) c.rider.visible = false; stopEngine(); P.pos.set(c.pos.x + Math.cos(c.h) * 3, 0, c.pos.z - Math.sin(c.h) * 3); P.vel.set(0, 0, 0); P.yaw = c.h + Math.PI; P.pitch = 0; return; }
   let best = null, bd = 5;
-  for (const c of cars) { const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; best = c; } }
+  for (const c of cars) { if (c.dead) continue; const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; best = c; } }
   if (best) { inCar = best; if (best.bike) { best.rider.visible = true; msg('Bike: W/S pedal, A/D steer, Space brake, E hop off', 2500); } else startEngine(); if (best.ai) { best.ai = null; msg('Carjacked!', 1500); } if (!best.bike && !best.owned && !best.stolen) { best.stolen = true; crime(1, 'car theft'); } if (!best.bike) msg('W/S drive, A/D steer, Space brake, E exit', 2500); } else msg('No car nearby', 900);
 }
 function driveCar(dt) {
@@ -25,8 +25,8 @@ function driveCar(dt) {
   c.h += steer * 1.8 * dt * Math.max(-1, Math.min(1, c.speed / 5));
   const t = { pos: new V3(c.pos.x + Math.sin(c.h) * c.speed * dt, 0, c.pos.z + Math.cos(c.h) * c.speed * dt), R: 1.3, H: 1.2 };
   let bad = false; for (const b of solids.values()) if (hit(t, b)) { bad = true; break; }
-  for (const o of cars) if (o !== c && dist2(o.pos, t.pos) < 2.8) bad = true;
-  if (bad) { if (Math.abs(c.speed) > 12) crime(1, 'reckless driving', 'crash', 1); if (Math.abs(c.speed) > 4) sfx('crash'); c.speed *= -0.3; } else c.pos.copy(t.pos);
+  let rammed = null; for (const o of cars) if (o !== c && dist2(o.pos, t.pos) < 2.8) { bad = true; rammed = o; }
+  if (bad) { if (Math.abs(c.speed) > 8) { damageCar(c, Math.abs(c.speed) * 1.4); if (rammed) damageCar(rammed, Math.abs(c.speed) * 2.2, true); } if (Math.abs(c.speed) > 12) crime(1, 'reckless driving', 'crash', 1); if (Math.abs(c.speed) > 4) sfx('crash'); c.speed *= -0.3; } else c.pos.copy(t.pos);
   c.mesh.position.copy(c.pos); c.mesh.rotation.y = c.h; animCar(c, dt, steer, thr);
   if (Math.abs(c.speed) > 6) for (const e of [...enemies, ...cops]) if (!e.dead && dist2(e.pos, c.pos) < 2.3) damageEnemy(e, 100);
   P.pos.copy(c.pos);
