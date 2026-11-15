@@ -97,6 +97,11 @@ function enemyStep(e, dt) {
   e.hurt -= dt; e.mat.color.setHex(e.hurt > 0 ? 0xffffff : e.col);
   e.cd -= dt;
   if (d < 1.8 && e.cd <= 0) { if (npc) npcHurt(npc, 6); else if (!inCar) hurt(8); e.cd = 0.7; }
+  e.gcd = (e.gcd === undefined ? 1 + Math.random() * 2 : e.gcd) - dt;
+  if (e.sold && !npc && d > 5 && d < 20 && e.gcd <= 0) { // armed thugs shoot from range (rarely hit)
+    e.gcd = 2 + Math.random() * 1.5; const o = new V3(e.pos.x, 1.6, e.pos.z), tg = new V3(T.x, inCar ? 1.2 : P.pos.y + 1.2, T.z), dir = tg.clone().sub(o), dl = dir.length(); dir.normalize();
+    copRay.set(o, dir); copRay.far = dl; if (!copRay.intersectObjects(targets, false)[0]) { sfxAt(e.pos, 'shoot'); e.flashAt = clock; e.aimT = 0.9; beam(o, tg, 0xffaa55, 80); if (Math.random() < 0.25) hurt(6, true); }
+  }
 }
 const nearestEnemy = (pos, r) => { let b = null, bd = r; for (const e of enemies) { if (e.dead) continue; const d = dist2(e.pos, pos); if (d < bd) { bd = d; b = e; } } return b; };
 

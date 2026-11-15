@@ -11,7 +11,7 @@ const vmBlock = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), vmBlockMats
 const vmFlash = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), new THREE.MeshBasicMaterial({ color: 0xffd36b, transparent: true, depthTest: false, blending: THREE.AdditiveBlending })); vmFlash.renderOrder = 1001; vmFlash.visible = false; vmFlash.frustumCulled = false;
 const vmHold = new THREE.Group(); vmHold.add(vmPistol, vmShotgun, vmBlock, vmFlash); vmFist.visible = false; VM.g.add(vmHold, vmFist);
 scene.add(cam); cam.add(VM.g);
-function vmShoot() { VM.kick = 1; VM.flash = 0.06; }
+function vmShoot() { VM.kick = 1; VM.flash = 0.06; if (pmod) gunFlash(pmod); }
 function vmPunch() { VM.punchT = 0.3; VM.hand = 1 - VM.hand; }
 function updateViewmodel(dt) {
   VM.g.visible = !inCar && !shopOpen && !tpv; if (!VM.g.visible) return;

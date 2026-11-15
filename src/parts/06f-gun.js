@@ -4,8 +4,14 @@ function mkGunProp(kind) { // barrel along +Y, top along +Z, grip at the origin 
   const g = new THREE.Group(), bx = (w, d, h, x, y, z, c) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, d, h), new THREE.MeshLambertMaterial({ color: c })); m.position.set(x, y, z); g.add(m); };
   if (kind === 'shotgun') { bx(0.05, 0.85, 0.055, 0, 0.32, 0.03, 0x2b2b2b); bx(0.06, 0.32, 0.075, 0, 0.0, 0.0, 0x6b4a2b); bx(0.045, 0.4, 0.045, 0, 0.3, -0.03, 0x555555); }
   else { bx(0.04, 0.26, 0.055, 0, 0.1, 0.035, 0x2b2b2b); bx(0.035, 0.09, 0.12, 0, 0.0, -0.03, 0x1c1c1c); bx(0.03, 0.02, 0.02, 0, 0.23, 0.07, 0x888888); }
+  const fl = new THREE.Group(), fm = new THREE.MeshBasicMaterial({ color: 0xffd36b, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const c1 = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.3, 7), fm); c1.position.y = 0.15; fl.add(c1);
+  const c2 = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.45, 5), fm); c2.position.y = 0.22; c2.rotation.x = 0.35; fl.add(c2); fm.opacity = 0.85;
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 5), fm); fl.add(ball);
+  fl.position.set(0, kind === 'shotgun' ? 0.78 : 0.27, kind === 'shotgun' ? 0.03 : 0.04); fl.visible = false; fl.name = 'flash'; g.add(fl);
   return g;
 }
+function gunFlash(s) { s.flashUntil = clock + 0.07; }
 function soldBones(s) {
   if (s.bones !== undefined) return s.bones;
   const r = s.root, bn = n => r.getObjectByName('mixamorig' + n) || r.getObjectByName('mixamorig:' + n), arm = bn('RightArm'), fore = bn('RightForeArm'), hand = bn('RightHand'); // the loader strips the ':' from names
@@ -27,6 +33,7 @@ function armGun(s, fwd, pitch, aiming, kind) {
   const B = soldBones(s); if (!B) return;
   if (kind !== B.kind) { while (B.holder.children.length) B.holder.remove(B.holder.children[0]); if (kind) { const g = mkGunProp(kind); g.position.set(0, 0.06, 0); B.holder.add(g); } B.kind = kind; }
   if (!kind) return;
+  const fl = B.holder.children[0] && B.holder.children[0].getObjectByName('flash'); if (fl) { fl.visible = clock < (s.flashUntil || 0); fl.rotation.y = Math.random() * 3; }
   const cp = Math.cos(pitch), dir = new V3(fwd.x * cp, Math.sin(pitch), fwd.z * cp).normalize();
   if (aiming) { aimBone(B.arm, dir); aimBone(B.fore, dir); setHandBasis(B.hand, dir); }
   else setHandBasis(B.hand, new V3(fwd.x, -0.9, fwd.z).normalize());

@@ -41,7 +41,7 @@ function copStep(e, dt) {
     e.cd = 1.1 + Math.random() * 0.5;
     const o = new V3(e.pos.x, 1.6, e.pos.z), tg = new V3(T.x, inCar ? 1.2 : P.pos.y + 1.2, T.z), dir = tg.clone().sub(o), dl = dir.length(); dir.normalize();
     copRay.set(o, dir); copRay.far = dl; if (copRay.intersectObjects(targets, false)[0]) return;
-    sfxAt(e.pos, 'shoot'); beam(o, tg, 0xff5555, 80); if (Math.random() < 0.35) hurt(8, true);
+    sfxAt(e.pos, 'shoot'); e.flashAt = clock; e.aimT = 1.0; beam(o, tg, 0xff5555, 80); if (Math.random() < 0.35) hurt(8, true);
   }
 }
 

@@ -1,5 +1,5 @@
 // ---------- real animated human (Soldier, Mixamo free model via three.js examples); falls back to the blocky humans if it can't load ----------
-let SOLDIER = null;
+let SOLDIER = null; const _gvE = new V3();
 try { new GLTFLoader().load('models/soldier.glb', gl => { SOLDIER = { scene: gl.scene, animations: gl.animations }; }, undefined, () => {}); } catch (e) {}
 function makeSoldier(tint, scale = 1) {
   const root = SkeletonUtils.clone(SOLDIER.scene), wrap = new THREE.Group(); root.scale.setScalar(scale); root.rotation.y = Math.PI; wrap.add(root);
@@ -24,5 +24,8 @@ function updateSoldiers(dt) {
     if (dist2(e.pos, P.pos) > 90) { s.last.copy(e.pos); continue; }
     const sp = e.pos.distanceTo(s.last) / dt; s.last.copy(e.pos);
     soldAnim(s, sp > 4 ? 'Run' : sp > 0.5 ? 'Walk' : 'Idle'); s.mixer.update(dt);
+    if (e.flashAt) { gunFlash(s); e.flashAt = 0; }
+    const th = e.mesh.rotation.y; e.aimT = Math.max(0, (e.aimT || 0) - dt);
+    armGun(s, _gvE.set(Math.sin(th), 0, Math.cos(th)), 0, e.cop ? dist2(e.pos, P.pos) < 26 || e.aimT > 0 : e.aimT > 0, 'pistol');
   }
 }
