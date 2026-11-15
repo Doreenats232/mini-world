@@ -1,5 +1,6 @@
 // ---------- online multiplayer (peer-to-peer, host-authoritative world) ----------
 let netT = 0;
+const PEER_CFG = { config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }, { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }, { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }] } };
 const nsend = (m, except) => { for (const c of net.conns) if (c.open && c !== except) c.send(m); };
 const toHost = m => { if (net.hostConn && net.hostConn.open) net.hostConn.send(m); };
 function netSend(m) { if (net.host) nsend(m); else toHost(m); }
@@ -44,6 +45,12 @@ function netTick() {
     const pl = [{ id: 'host', name: net.name, x: r2(P.pos.x), y: r2(P.pos.y), z: r2(P.pos.z), yaw: r2(yaw) }];
     for (const c of net.conns) if (c.st) pl.push({ id: c.peer, name: c.nm, ...c.st });
     net.names = pl.map(p => p.name);
+    const live = new Set();
+    for (const c of net.conns) if (c.st && c.peer) {
+      live.add(c.peer); if (!net.remotes.has(c.peer)) mkAvatar(c.peer, c.nm || 'Player');
+      const r = net.remotes.get(c.peer); r.tp.set(c.st.x, c.st.y, c.st.z); r.yaw = c.st.yaw; if (r.first) { r.pos.copy(r.tp); r.first = false; }
+    }
+    for (const id of [...net.remotes.keys()]) if (!live.has(id)) removeAvatar(id);
     nsend({ t: 'ps', pl, day: dayT, npcs: npcs.map(n => ({ id: n.id, x: r2(n.pos.x), y: r2(n.pos.y), z: r2(n.pos.z), f: r2(n.face), w: n.walking ? 1 : 0, k: n.working ? 1 : 0, s: n.swing > 0 ? 1 : 0, st: n.status, hp: Math.round(n.hp) })) });
   } else toHost({ t: 'p', x: r2(P.pos.x), y: r2(P.pos.y), z: r2(P.pos.z), yaw: r2(yaw) });
 }
@@ -88,15 +95,15 @@ function hostRoom(tries = 0) {
   if (net.on || net.peer) return;
   const code = Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
   mpErr('Creating room…');
-  const peer = new Peer('mwld-' + code); net.peer = peer;
+  const peer = new Peer('mwld-' + code, PEER_CFG); net.peer = peer;
   peer.on('open', () => { net.on = true; net.host = true; net.code = code; mpUpdate(); logLine('🌐 Room open. Share the code ' + code, 'ev'); });
-  peer.on('connection', c => { c.on('data', m => hostData(c, m)); c.on('close', () => { const i = net.conns.indexOf(c); if (i >= 0) net.conns.splice(i, 1); nsend({ t: 'chat', name: '🌐', text: (c.nm || 'A player') + ' left' }); logLine('🌐 ' + (c.nm || 'A player') + ' left', 'ev'); mpUpdate(); }); });
+  peer.on('connection', c => { c.on('data', m => hostData(c, m)); c.on('close', () => { const i = net.conns.indexOf(c); if (i >= 0) net.conns.splice(i, 1); removeAvatar(c.peer); nsend({ t: 'chat', name: '🌐', text: (c.nm || 'A player') + ' left' }); logLine('🌐 ' + (c.nm || 'A player') + ' left', 'ev'); mpUpdate(); }); });
   peer.on('error', e => { if (e.type === 'unavailable-id' && tries < 4) { net.peer = null; peer.destroy(); hostRoom(tries + 1); } else mpErr('Could not create room (' + e.type + '). Check your connection.'); });
 }
 function joinRoom(code) {
   if (net.on || net.peer || !code) return;
   code = code.toUpperCase().replace(/[^A-Z0-9]/g, ''); mpErr('Connecting to ' + code + '…');
-  const peer = new Peer(); net.peer = peer;
+  const peer = new Peer(undefined, PEER_CFG); net.peer = peer;
   peer.on('open', id => {
     net.myId = id; const c = peer.connect('mwld-' + code, { reliable: true }); net.hostConn = c;
     c.on('open', () => c.send({ t: 'hello', name: net.name, ver: VER })); c.on('data', clientData);
