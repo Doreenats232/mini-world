@@ -1,5 +1,5 @@
 // ---------- third-person view: you see your own soldier walk, run and walk up to a car door before getting in (V toggles) ----------
-let tpv = true, pmod = null, enter = null, enterGo = false;
+const _gv2 = new V3(); let tpv = true, pmod = null, enter = null, enterGo = false;
 try { if (localStorage.getItem('mw_tpv') === '0') tpv = false; } catch (e) {}
 function toggleView() { tpv = !tpv; try { localStorage.setItem('mw_tpv', tpv ? '1' : '0'); } catch (e) {} msg(tpv ? 'Third-person view (V to switch)' : 'First-person view (V to switch)', 1500); }
 function tpCamera() {
@@ -30,8 +30,10 @@ function updatePlayerModel(dt) {
   const show = tpv && !inCar && !shopOpen; pmod.root.visible = show;
   if (!show) { pmod.last.copy(P.pos); return; }
   const dx = P.pos.x - pmod.last.x, dz = P.pos.z - pmod.last.z, sp = Math.hypot(dx, dz) / Math.max(dt, 0.001); pmod.last.copy(P.pos);
-  let tg = pmod.face; if (enter && enter.face != null) tg = enter.face; else if (sp > 0.8) tg = Math.atan2(dx, dz); else if (cool > 0) tg = P.yaw + Math.PI;
+  const armed = mode === 'fight' && !enter; if (armed && (cool > 0 || held)) pmod.aimT = 2.2; else pmod.aimT = Math.max(0, (pmod.aimT || 0) - dt);
+  let tg = pmod.face; if (enter && enter.face != null) tg = enter.face; else if (armed && pmod.aimT > 0) tg = P.yaw + Math.PI; else if (sp > 0.8) tg = Math.atan2(dx, dz);
   let dr = tg - pmod.face; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); pmod.face += dr * Math.min(1, dt * 12);
   pmod.root.position.set(P.pos.x, P.pos.y, P.pos.z); pmod.root.rotation.y = pmod.face;
   soldAnim(pmod, sp > 5 ? 'Run' : sp > 0.5 ? 'Walk' : 'Idle'); pmod.mixer.update(dt);
+  armGun(pmod, _gv2.set(Math.sin(pmod.face), 0, Math.cos(pmod.face)), P.pitch * 0.8, armed && pmod.aimT > 0, mode === 'fight' && !enter ? weapon : null);
 }
