@@ -91,7 +91,7 @@ function mkCityDoor(b) {
 }
 function spawnInterior(b) {
   let sd = (b.id * 7919 + 13) % 2147483647 || 1; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
-  const kind = ['home', 'office', 'store', 'cafe'][Math.floor(r() * 4)], groups = [], PI = Math.PI;
+  const kind = b.purpose ? ({ school: 'school', university: 'school', company: 'office', nasa: 'office' })[b.purpose] : ['home', 'office', 'store', 'cafe'][Math.floor(r() * 4)], groups = [], PI = Math.PI, crowd = [];
   const put = (type, x, z, rot) => { const g = new THREE.Group(); mkFurn(type, g); g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g); groups.push(g); if (USEF.has(type)) regUse(g, type, b); };
   const slots = [];
   for (const sr of [0, PI / 2, PI, -PI / 2]) {
@@ -100,16 +100,18 @@ function spawnInterior(b) {
     for (let u = -Lw / 2 + 2.9; u <= Lw / 2 - 2.9; u += 2.3) { if (sr === b.ry && Math.abs(u) < 2.6) continue; slots.push({ x: b.x + sx * (half - CT - 0.95) + tx * u, z: b.z + sz * (half - CT - 0.95) + tz * u, rot: sr + PI }); }
   }
   for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
-  const WALL = { home: ['bed', 'fridge', 'stove', 'sink', 'shelf', 'toilet', 'tub', 'lamp', 'plant', 'bed'], office: ['shelf', 'shelf', 'plant', 'lamp', 'shelf', 'sink', 'toilet', 'plant'], store: ['shelf', 'shelf', 'shelf', 'shelf', 'fridge', 'plant', 'lamp', 'shelf'], cafe: ['stove', 'fridge', 'sink', 'shelf', 'plant', 'lamp', 'toilet', 'plant'] }[kind];
+  const WALL = { home: ['bed', 'fridge', 'stove', 'sink', 'shelf', 'toilet', 'tub', 'lamp', 'plant', 'bed'], office: ['shelf', 'shelf', 'plant', 'lamp', 'shelf', 'sink', 'toilet', 'plant'], store: ['shelf', 'shelf', 'shelf', 'shelf', 'fridge', 'plant', 'lamp', 'shelf'], cafe: ['stove', 'fridge', 'sink', 'shelf', 'plant', 'lamp', 'toilet', 'plant'], school: ['shelf', 'shelf', 'plant', 'lamp', 'shelf', 'toilet', 'sink', 'plant'] }[kind];
   slots.forEach((sl, i) => { if (i < WALL.length) put(WALL[i], sl.x, sl.z, sl.rot); });
   const set = (x, z) => { put('table', x, z, 0); put('chair', x - 1.3, z, PI / 2); put('chair', x + 1.3, z, -PI / 2); };
-  if (Math.min(b.w, b.d) >= 9) {
+  const sit = (x, z, yaw) => { if (crowd.length >= 6) return; let c; try { c = mkCitizen('sitter', x, z, yaw, { home: new V3(x, 0, z), isStatic: true, sit: true }); } catch (e) { return; } if (b.purpose === 'school') c.g.scale.setScalar(0.65); crowd.push(c); };
+  if (kind === 'school') { const sets = Math.min(b.w, b.d) >= 9 ? [[-2.4, -1.5], [2.4, -1.5], [-2.4, 1.5], [2.4, 1.5]] : [[0, 0]]; for (const [dx, dz] of sets) { set(b.x + dx, b.z + dz); sit(b.x + dx - 1.3, b.z + dz, PI / 2); sit(b.x + dx + 1.3, b.z + dz, -PI / 2); } }
+  else if (Math.min(b.w, b.d) >= 9) {
     if (kind === 'home') { put('rug', b.x, b.z, 0); set(b.x, b.z); } else if (kind === 'office') { set(b.x - 2.5, b.z); set(b.x + 2.5, b.z + 1.5); } else if (kind === 'cafe') { set(b.x - 2.2, b.z); set(b.x + 2.2, b.z); } else put('table', b.x, b.z, 0);
   }
-  b.int = { groups, door: mkCityDoor(b) };
+  b.int = { groups, crowd, door: mkCityDoor(b) };
 }
 function despawnInterior(b) {
-  const it = b.int; if (!it) return;
+  const it = b.int; if (!it) return; for (const c of it.crowd || []) removeCitizen(c);
   for (const g of it.groups) { scene.remove(g); g.traverse(m => { if (m.isMesh) m.geometry.dispose(); }); }
   unregOwner(b); const d = it.door; solids.delete('d' + d.k); const i = doors.indexOf(d); if (i >= 0) doors.splice(i, 1); scene.remove(d.grp); b.int = null;
 }

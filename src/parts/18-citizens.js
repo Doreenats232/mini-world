@@ -13,6 +13,8 @@ const CLINES = {
   vendor: ['Fresh fruit! Get your fruit!', 'Best prices in town!', 'Come and look, friend!', 'Apples, bananas, mangoes!'],
   chatter: ['Did you hear about the new tower?', 'Haha, no way!', 'And then he said...', "That's what I told him."],
   sitter: ['Just resting my feet.', 'Nice spot for a break.', 'Watching the town go by.'],
+  student: ['Exams next week...', 'Have you finished the assignment?', 'Studying is hard!', 'Best university in town.'],
+  suit: ['Meeting in five minutes.', 'Busy day at the office.', 'Business is booming.', 'Sorry, no time to chat.'],
   kid: ['Wheee!', 'Catch me!', 'Are you a builder?', 'I want a bike!'],
   dogwalker: ['Good boy!', 'He loves a walk.', "Don't pet him, he's shy.", 'Walkies!'],
   busker: ['♪ la la la ♪', 'Spare a coin?', 'This one is for you!'],
@@ -58,6 +60,8 @@ function outfit(job) {
   if (job === 'shopper') o.bag = pick([0xc0392b, 0x2980b9, 0xf1c40f, 0xecf0f1]);
   if (job === 'cyclist') Object.assign(o, { hat: pick([0xff4d4d, 0x4dd2ff, 0xf1c40f]), pack: 0 });
   if (job === 'sweeper') Object.assign(o, { hat: 0x2ecc71, vest: 0x2ecc71, pack: 0 });
+  if (job === 'student') Object.assign(o, { pack: pick(SHIRTS), hat: 0 });
+  if (job === 'suit') Object.assign(o, { shirt: 0xecf0f1, pants: 0x2c3e50, hat: 0, pack: 0, glasses: Math.random() < 0.4 });
   return o;
 }
 const prop = list => new THREE.Mesh(mergeGeometries(list, false), CITMAT);
@@ -190,7 +194,8 @@ function citizenStep(c, dt) {
       break;
     }
     case 'watcher': if (c.site.status === 'complete') { c.cheer = (c.cheer || 0) + dt; animStand(c); c.aL.rotation.x = c.aR.rotation.x = -2.6 + Math.sin(c.t * 14) * 0.5; if (!c.clapped) { c.clapped = true; citizenSay(c, pick(['Bravo!', 'Beautiful!', 'What a building!'])); } if (c.cheer > 6) { c.job = 'walker'; c.isStatic = false; c.resnap = true; c.doorT = 5; } } else { animStand(c); c.yaw = Math.atan2(c.site.x - c.pos.x, c.site.z - c.pos.z); } break;
-    case 'kid': { if (moveToward(c, c.tgt, 4.2, dt) || c.t % 3 < dt) c.tgt.set(c.home.x + (Math.random() - 0.5) * 14, 0, c.home.z + (Math.random() - 0.5) * 14); animWalk(c, 4.2, dt, 1.1); c.bounce = Math.abs(Math.sin(c.t * 9)) * 0.12; break; }
+    case 'kid': { if (moveToward(c, c.tgt, 4.2, dt) || c.t % 3 < dt) { if (c.inst) c.tgt.copy(instTgt(c)); else c.tgt.set(c.home.x + (Math.random() - 0.5) * 14, 0, c.home.z + (Math.random() - 0.5) * 14); } animWalk(c, 4.2, dt, 1.1); c.bounce = Math.abs(Math.sin(c.t * 9)) * 0.12; break; }
+    case 'student': case 'suit': { if (moveToward(c, c.tgt, 1.6, dt) || c.t % 6 < dt) { if (c.inst) c.tgt.copy(instTgt(c)); } animWalk(c, 1.6, dt, 0.8); break; }
     case 'worker': c.lL.rotation.x = 0; c.lR.rotation.x = 0; c.aL.rotation.x = 0; c.aR.rotation.x = -1.1 + Math.sin(c.t * 12) * 0.6; if (Math.sin(c.t * 12) > 0.98 && dp < 25) sfxAt(c.pos, 'chop'); break;
     case 'vendor': animStand(c); c.aR.rotation.x = c.t % 6 < 1 ? -2.2 + Math.sin(c.t * 10) * 0.3 : 0; break;
     case 'busker': animStand(c); c.aR.rotation.x = -0.6 + Math.sin(c.t * 8) * 0.25; c.aL.rotation.x = -0.9; if (dp < 22 && (c.noteT = (c.noteT || 0) - dt) <= 0) { c.noteT = 0.4 + Math.random() * 0.3; sfx('note', Math.max(0, 1 - dp / 22)); } break;
