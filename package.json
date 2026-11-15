@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "dist": "vite build && electron-builder --win --publish never",
-    "test": "node scripts/test.mjs && node scripts/smoke.mjs",
+    "test": "node scripts/test.mjs && node scripts/smoke.mjs && SMOKE_FRESH=1 node scripts/smoke.mjs",
     "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
@@ -23,6 +23,7 @@
     "@capacitor/cli": "^6.0.0",
     "electron": "^30.0.0",
     "electron-builder": "^24.13.3",
+    "jsdom": "^31.0.1",
     "vite": "^5.2.0"
   },
   "build": {

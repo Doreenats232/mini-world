@@ -2,14 +2,22 @@
 import fs from 'fs'; import path from 'path'; import * as THREE from 'three'; import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 const dir = 'src/parts';
 const src = fs.readdirSync(dir).filter(f => f.endsWith('.js')).sort().map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('').split('\n').filter(l => !l.startsWith('import ')).join('\n').replace(/__V__/g, '"smoke"');
+import { JSDOM } from 'jsdom';
+const html = fs.readFileSync('index.html', 'utf8').replace(/<script[\s\S]*?<\/script>/g, '');
+const dom = new JSDOM(html, { url: 'https://doreenats232.github.io/mini-world/', pretendToBeVisual: true });
+const W = dom.window;
 const fake = () => { const store = {}; return new Proxy(function () {}, { get(t, k) { if (k === Symbol.toPrimitive || k === 'toString' || k === 'valueOf') return () => ''; if (k === 'then') return undefined; if (k === 'children') return []; if (k === 'length') return 0; if (typeof k === 'symbol') return undefined; if (!(k in store)) store[k] = fake(); return store[k]; }, set(t, k, v) { store[k] = v; return true; }, apply() { return fake(); } }); };
-Object.assign(globalThis, { window: globalThis, document: fake(), matchMedia: () => ({ matches: false }), innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1, addEventListener() {}, removeEventListener() {}, location: { protocol: 'file:', pathname: '/', replace() {} }, localStorage: { getItem: () => null, setItem() {} }, fetch: async () => ({ json: async () => ({}), ok: false }) });
-class FakeRenderer { constructor() { this.domElement = fake(); } setSize() {} setPixelRatio() {} setAnimationLoop(f) { globalThis.__loop = f; } render() {} }
+W.HTMLCanvasElement.prototype.toDataURL = () => ''; W.HTMLCanvasElement.prototype.getContext = () => fake2d; const fake2d = fake();
+Object.defineProperty(globalThis, 'navigator', { value: W.navigator, configurable: true });
+Object.assign(globalThis, { window: W, document: W.document, matchMedia: () => ({ matches: false }), innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1, addEventListener: W.addEventListener.bind(W), removeEventListener() {}, location: W.location, localStorage: W.localStorage, fetch: async () => ({ json: async () => ({}), ok: false }) });
+W.matchMedia = globalThis.matchMedia;
+if (!process.env.SMOKE_FRESH) { W.localStorage.setItem('mw_save', JSON.stringify({ b: [[10, 0, 10, 0], [11, 0, 10, 2], [12, 1, 10, 3]], p: [25, 1, 25, 0], k: 3, m: 120, u: { dmg: 1, hp: 1, spd: 0 }, sg: true, f: [[12, 0, 12, 'bed', 0], [13, 0, 12, 'door', 1], [14, 0, 12, 'lamp', 0], [15, 0, 12, 'sink', 0], [16, 0, 12, 'fridge', 0], [17, 0, 12, 'stove', 2]] })); W.localStorage.setItem('mw_relay', JSON.stringify({ key: 'test-key' })); console.log('(booting WITH a saved world + relay key)'); }
+class FakeRenderer { constructor() { this.domElement = W.document.createElement('canvas'); this.domElement.requestPointerLock = () => {}; } setSize() {} setPixelRatio() {} setAnimationLoop(f) { globalThis.__loop = f; } render() {} }
 class FakePeer { on() {} }
 const T = { ...THREE, WebGLRenderer: FakeRenderer };
 const API = 'P, cars, citizens, enemies, npcs, cops, buildings, structures, shoot, punch, toggleCar, tryUse, tryTalk, spawnJob, spawnInterior, updateCity, startTown, addBlock, addFurniture, spawnTrafficCar, crime, damageEnemy, mkEnemy, playerSay, JW, doors, useables, mkCar, setMode: v => { mode = v; }, getWanted: () => wanted, getMode: () => mode';
 let api, fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok  ', m); };
-try { api = new Function('THREE', 'mergeGeometries', 'Peer', `'use strict';\n${src}\n;return { ${API} };`)(T, mergeGeometries, FakePeer); ok(true, 'game boots (all parts initialise in order, no TDZ/ReferenceError)'); }
+try { api = new Function('THREE', 'mergeGeometries', 'Peer', `'use strict';\n${src}\n;return { ${API} };`)(T, mergeGeometries, FakePeer); ok(true, 'game boots' + (process.env.SMOKE_FRESH ? ' on a fresh world' : ' and restores a saved world (blocks, furniture, doors, fixtures)')); }
 catch (e) { ok(false, 'BOOT FAILED: ' + e.stack.split('\n').slice(0, 4).join(' | ')); process.exit(1); }
 const loop = globalThis.__loop; let t = 1000; const frames = n => { for (let i = 0; i < n; i++) { t += 16.7; loop(t); } };
 const step = (name, fn) => { try { fn(); ok(true, name); } catch (e) { ok(false, name + ': ' + e.stack.split('\n').slice(0, 3).join(' | ')); } };

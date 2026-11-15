@@ -52,7 +52,6 @@ function updateDoors(dt) {
     if (d.open > 0.5 && d.solid) { solids.delete('d' + d.k); d.solid = false; } else if (d.open <= 0.5 && !d.solid) { solids.set('d' + d.k, d.box); d.solid = true; }
   }
 }
-if (pendingFurn) pendingFurn.forEach(a => addFurniture(a[0], a[1], a[2], a[3], a[4], false, false));
 
 // ---------- interactive fixtures (E to use) ----------
 const useables = [], USEF = new Set(['lamp', 'sink', 'toilet', 'fridge', 'stove', 'bed']);
@@ -122,4 +121,5 @@ function updateCity() {
     const inter = dm < (b.int ? 48 : 36); if (inter && !b.int) spawnInterior(b); else if (!inter && b.int) despawnInterior(b);
   }
 }
-
+// restore saved furniture LAST: addFurniture needs USEF/useables (declared above), otherwise loading a saved world crashes at start-up
+if (pendingFurn) pendingFurn.forEach(a => addFurniture(a[0], a[1], a[2], a[3], a[4], false, false));
