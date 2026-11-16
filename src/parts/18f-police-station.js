@@ -11,7 +11,7 @@ function policeLights(b, on) {
   if (b.pcar && b.pcar.bar) { b.pcar.bar[0].color.setHex(f ? 0xff2020 : 0x330000); b.pcar.bar[1].color.setHex(on && !f ? 0x2060ff : 0x000033); }
   if (b.beacon) { b.beacon[0].color.setHex(f ? 0xff2020 : 0x330000); b.beacon[1].color.setHex(on && !f ? 0x2060ff : 0x000033); }
 }
-function dropPrisoner(e) { e.dead = true; e.hp = 0; scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); const i = enemies.indexOf(e); if (i >= 0) enemies.splice(i, 1); }
+function dropPrisoner(e) { if (e.job === 'thief') { dropThief(e); removeCitizen(e); return; } e.dead = true; e.hp = 0; scene.remove(e.mesh); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); const i = enemies.indexOf(e); if (i >= 0) enemies.splice(i, 1); }
 function stepToward(o, tx, tz, sp, dt) { const dx = tx - o.x, dz = tz - o.z, d = Math.hypot(dx, dz), s = Math.min(d, sp * dt); if (d > 0.001) { o.x += dx / d * s; o.z += dz / d * s; } return d - s; }
 function placePatrol(b, rt, t, rev, dt) {
   const w = routeAt(rt, Math.max(0, Math.min(rt.T, t)), rev), c = b.pcar, dh = Math.atan2(Math.sin(w.h - c.h), Math.cos(w.h - c.h));
@@ -32,7 +32,7 @@ function policeTick(dt) {
     if (!b.pcar) continue;
     if (!m) {
       if (b.cool > 0) continue; let best = null, bd = 1e9;
-      for (const e of enemies) { if (e.dead || e.arrested || e.hp <= 0) continue; const d = Math.hypot(e.pos.x - b.x, e.pos.z - b.z); if (d < 90 && d < bd) { bd = d; best = e; } }
+      for (const e of enemies.concat(thieves)) { if (e.dead || e.arrested || e.hp <= 0 || (e.hidden && !e.robbed)) continue; const d = Math.hypot(e.pos.x - b.x, e.pos.z - b.z); if (d < (e.job === 'thief' ? 260 : 90) && d < bd) { bd = d; best = e; } }
       if (best) { const dst = nearestBld(best.pos, b) || b; b.mis = { st: 'go', el: 0, t: 0, rt: buildRoute(b, dst), e: best, off: null, sirenT: 0 }; }
       continue;
     }
@@ -43,13 +43,13 @@ function policeTick(dt) {
     } else if (m.st === 'chase') {
       const o = m.off; m.t += dt;
       if (o.dead || e.dead || e.hp <= 0 || m.t > 25) { if (!o.dead) removeCitizen(o); m.off = null; m.st = 'return'; m.el = 0; continue; }
-      const left = stepToward(o.pos, e.pos.x, e.pos.z, 5.5, dt); o.yaw = Math.atan2(e.pos.x - o.pos.x, e.pos.z - o.pos.z); o.stand = false;
-      if (left < 1.8) { e.arrested = true; msg('🚔 Police arrested a thug', 2200); m.st = 'escort'; }
+      const left = stepToward(o.pos, e.pos.x, e.pos.z, e.job === 'thief' ? 8 : 5.5, dt); o.yaw = Math.atan2(e.pos.x - o.pos.x, e.pos.z - o.pos.z); o.stand = false;
+      if (left < 1.8) { e.arrested = true; msg(e.job === 'thief' ? '🚔 Police arrested a bank robber' : '🚔 Police arrested a thug', 2200); e.stand = true; m.st = 'escort'; }
     } else if (m.st === 'escort') {
       const o = m.off; if (o.dead) { m.off = null; m.st = 'return'; m.el = 0; continue; }
       const left = stepToward(o.pos, c.pos.x, c.pos.z, 3.4, dt), dx = c.pos.x - o.pos.x, dz = c.pos.z - o.pos.z, dl = Math.hypot(dx, dz) || 1; o.yaw = Math.atan2(dx, dz);
-      if (!e.dead && e.hp > 0) { e.pos.x = o.pos.x - dx / dl * 1.3; e.pos.z = o.pos.z - dz / dl * 1.3; e.mesh.position.copy(e.pos); e.mesh.rotation.y = o.yaw; }
-      if (left < 2.5) { if (!e.dead && e.hp > 0) { dropPrisoner(e); b.booked = (b.booked || 0) + 1; } removeCitizen(o); m.off = null; m.st = 'return'; m.el = 0; }
+      if (!e.dead && e.hp !== 0) { e.pos.x = o.pos.x - dx / dl * 1.3; e.pos.z = o.pos.z - dz / dl * 1.3; if (e.mesh) { e.mesh.position.copy(e.pos); e.mesh.rotation.y = o.yaw; } else e.yaw = o.yaw; }
+      if (left < 2.5) { if (!e.dead && e.hp !== 0) { dropPrisoner(e); b.booked = (b.booked || 0) + 1; } removeCitizen(o); m.off = null; m.st = 'return'; m.el = 0; }
     } else {
       m.el += dt; placePatrol(b, m.rt, m.rt.T - m.el, true, dt); if (m.el >= m.rt.T) endMission(b, m.rt, 40);
     }

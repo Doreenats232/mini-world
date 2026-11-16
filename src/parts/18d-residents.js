@@ -33,6 +33,7 @@ function routeAt(rt, t, rev) {
     if (wb.purpose === 'school') { role = 'teacher'; label = 'teacher'; workName = wb.pname; }
     else if (wb.purpose === 'university') { role = 'student'; label = Math.random() < 0.5 ? 'student' : 'lecturer'; workName = wb.pname; }
     else if (wb.purpose === 'company') { role = 'suit'; label = 'office worker'; workName = wb.pname; }
+    else if (wb.purpose === 'bank') { role = 'suit'; label = 'bank teller'; workName = wb.pname; }
     else if (wb.purpose === 'police') { role = 'suit'; label = 'police clerk'; workName = wb.pname; }
     else if (wb.purpose === 'nasa') { role = 'suit'; label = 'scientist'; workName = wb.pname; }
     else { const w = WORKS[wb.id % WORKS.length]; workName = w[0]; label = w[1]; role = (label === 'factory worker' || label === 'mechanic') ? 'worker' : 'walker'; }
