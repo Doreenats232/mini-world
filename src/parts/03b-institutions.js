@@ -16,10 +16,13 @@ const institutions = [];
   const CN = CP.map((p, i) => p.toUpperCase() + ' ' + CS[(i * 5) % 8]);
   take([...dtn].sort((a, b) => area(b) - area(a)), 'university', 6, 150, ['MLD UNIVERSITY', 'CITY COLLEGE', 'TECH INSTITUTE', 'ROYAL UNIVERSITY', 'NORTHGATE COLLEGE', 'SAINT PAUL UNIVERSITY']);
   take(buildings.filter(b => b.rich).sort((a, b) => area(b) - area(a)), 'nasa', 1, 0, ['NASA SPACE CENTRE']);
+  take(dtn.filter(b => b.h <= 16 && area(b) >= 100).sort((a, b) => (a.id * 31 % 17) - (b.id * 31 % 17)), 'police', 1, 0, ['CENTRAL POLICE STATION']);
+  take(buildings.filter(b => b.rich && b.h <= 12 && area(b) >= 100).sort((a, b) => b.id - a.id), 'police', 1, 0, ['EASTSIDE POLICE STATION']);
+  take(buildings.filter(b => b.slum && area(b) >= 60).sort((a, b) => b.id - a.id), 'police', 1, 0, ['WESTSIDE POLICE STATION']);
   take(buildings.filter(b => b.h <= 14 && area(b) >= 90).sort((a, b) => (a.id * 7919 % 101) - (b.id * 7919 % 101)), 'school', 30, 55, SN);
   take(dtn.filter(b => b.h >= 28).sort((a, b) => b.h - a.h), 'company', 24, 45, CN);
 })();
-const INST_LOOK = { school: ['#e67e22', '#fff', 'SCHOOL'], university: ['#8e44ad', '#fff', 'UNIVERSITY'], company: ['#1f3a5f', '#e8f1ff', 'COMPANY'], nasa: ['#0b1a3a', '#ffffff', 'SPACE RESEARCH'] };
+const INST_LOOK = { school: ['#e67e22', '#fff', 'SCHOOL'], university: ['#8e44ad', '#fff', 'UNIVERSITY'], company: ['#1f3a5f', '#e8f1ff', 'COMPANY'], nasa: ['#0b1a3a', '#ffffff', 'SPACE RESEARCH'], police: ['#10265c', '#ffffff', 'POLICE · CALL 999'] };
 function signTex(text, sub, bg, fg) {
   return mkTex(512, 128, (g, w, h) => {
     g.fillStyle = bg; g.fillRect(0, 0, w, h); g.strokeStyle = fg; g.lineWidth = 6; g.strokeRect(5, 5, w - 10, h - 10);
@@ -47,9 +50,10 @@ const INSTMATS = {
   school: instMat((g, w, h) => band(g, w, h, '#f3e3a5', '#3f7d58', 0.55, '#f7f1d8'), (g, w, h) => { for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) { g.fillStyle = (x + y) % 2 ? '#aebf9a' : '#dfe5cf'; g.fillRect(x * 32, y * 32, 32, 32); } g.strokeStyle = 'rgba(0,0,0,.18)'; g.strokeRect(0.5, 0.5, 63, 63); g.strokeRect(32.5, 0.5, 0, 63); speck(g, w, h, 120, 'rgba(255,255,255,.2)', 'rgba(0,0,0,.08)'); }),
   university: instMat((g, w, h) => { band(g, w, h, '#efe6d6', '#7a5230', 0.5, '#4a3320'); g.fillStyle = 'rgba(0,0,0,.25)'; for (let x = 0; x < w; x += 10) g.fillRect(x, h * 0.5, 1, h * 0.5); }, (g, w, h) => { for (let r = 0; r < 8; r++) { g.fillStyle = `hsl(25,${rr(40, 50)}%,${rr(28, 38)}%)`; g.fillRect(0, r * 8, w, 8); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, r * 8, w, 1); g.fillRect(((r * 23) % 40) + 8, r * 8, 1, 8); } }),
   company: instMat((g, w, h) => { band(g, w, h, '#e9edf2', '#2e5c9a', 0.7, '#ffffff'); }, (g, w, h) => { g.fillStyle = '#4b5b73'; g.fillRect(0, 0, w, h); speck(g, w, h, 700, 'rgba(255,255,255,.1)', 'rgba(0,0,0,.18)'); }),
+  police: instMat((g, w, h) => band(g, w, h, '#e8edf5', '#10265c', 0.6, '#ffd400'), (g, w, h) => { g.fillStyle = '#9aa3ad'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(0,0,0,.25)'; g.strokeRect(0.5, 0.5, 31, 31); g.strokeRect(32.5, 32.5, 31, 31); speck(g, w, h, 150, 'rgba(255,255,255,.15)', 'rgba(0,0,0,.1)'); }),
   nasa: instMat((g, w, h) => band(g, w, h, '#f5f7fa', '#14284f', 0.7, '#e0301e'), (g, w, h) => { g.fillStyle = '#eef2f7'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(70,110,190,.35)'; g.strokeRect(0.5, 0.5, 31, 31); g.strokeRect(32.5, 32.5, 31, 31); g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(33, 1, 30, 30); g.fillRect(1, 33, 30, 30); }),
 };
-const INSTFAC = { school: 1, university: 3, company: 2, nasa: 0 };
+const INSTFAC = { school: 1, university: 3, company: 2, nasa: 0, police: 2 };
 for (const b of institutions) {
   const [iw, ifl] = INSTMATS[b.purpose]; b.iv = iw; b.fv = ifl; b.v = INSTFAC[b.purpose];
   if (b.shell) { scene.remove(b.shell); const i = targets.indexOf(b.shell); if (i >= 0) targets.splice(i, 1); b.shell.geometry.dispose(); }

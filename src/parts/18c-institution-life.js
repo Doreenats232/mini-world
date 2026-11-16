@@ -1,5 +1,5 @@
 // ---- life at the institutions: school day (class / break / home time), gates, guards, students, staff ----
-const INST_JOBS = { school: ['kid', 6], university: ['student', 6], company: ['suit', 3], nasa: ['suit', 4] };
+const INST_JOBS = { school: ['kid', 6], university: ['student', 6], company: ['suit', 3], nasa: ['suit', 4], police: ['suit', 0] };
 let instT = 0;
 function instTgt(c) {
   const b = c.inst, ox = Math.sin(b.ry), oz = Math.cos(b.ry), tx = Math.cos(b.ry), tz = -Math.sin(b.ry), u = (Math.random() - 0.5) * 12, o = Math.random() * 2;

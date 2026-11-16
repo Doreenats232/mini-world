@@ -82,6 +82,7 @@ function damageEnemy(e, n, quiet) {
   if (e.hp <= 0) { sfxAt(e.pos, 'edie'); e.dead = true; e.mesh.rotation.order = 'YXZ'; corpses.push({ m: e.mesh, t: 0 }); e.mesh.children.forEach(m => { const i = enemyMeshes.indexOf(m); if (i >= 0) enemyMeshes.splice(i, 1); }); if (e.cop) { if (!quiet) crime(1, 'killed a cop', 'copKill'); } else if (!quiet) { kills++; money += 25; hud(); } }
 }
 function enemyStep(e, dt) {
+  if (e.arrested) { e.mesh.position.copy(e.pos); return; }
   if (stunned(e, dt)) return;
   let T = inCar ? inCar.pos : P.pos, npc = null;
   const dp = dist2(T, e.pos);
