@@ -49,6 +49,7 @@ function resPhase(r) {
 }
 function updateResidents(dt) {
   for (const r of residents) {
+    if (r.vis) { updateVisit(r, dt); continue; }
     if (r.out > 0) { r.out -= dt; continue; } if (r.cool > 0) r.cool -= dt;
     if (r.c && r.c.dead) { r.c = null; r.cool = 6; }
     if (r.c && (r.c.fleeT > 0 || r.c.downT > 0)) { r.c.res = null; r.c.job = 'walker'; r.c.axis = 'x'; r.c.line = roadLn(r.c.pos.z); r.c.lane = 3; r.c.dir = 1; r.c.nextI = nextI(r.c.pos.x, 1); r.c.doorT = 99; r.c = null; r.out = 30; continue; }

@@ -153,7 +153,7 @@ function citizenSay(c, text) {
   b.c = c; b.t = 3.5 + text.length / 14; b.bub.textContent = c.name + ': ' + text; b.el.style.display = 'block';
 }
 const nearestCitizen = () => { let b = null, bd = 2.8; for (const c of citizens) { if (c.hidden || c.dead) continue; const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; b = c; } } return b; };
-function tryTalk() { const c = nearestCitizen(); if (!c) return false; const r = c.res; citizenSay(c, r && Math.random() < 0.6 ? (r.st === 'toWork' ? 'Heading to work at ' + r.workName + '.' : r.st === 'toHome' ? 'Finished at ' + r.workName + ', going home.' : 'I work at ' + r.workName + '.') : pick(CLINES[c.role || c.job] || CLINES.walker)); c.faceT = 3; sfx('click'); return true; }
+function tryTalk() { const c = nearestCitizen(); if (!c) return false; const r = c.res; if (r && maybeGiveNumber(r, c)) return true; citizenSay(c, r && Math.random() < 0.6 ? (r.st === 'toWork' ? 'Heading to work at ' + r.workName + '.' : r.st === 'toHome' ? 'Finished at ' + r.workName + ', going home.' : 'I work at ' + r.workName + '.') : pick(CLINES[c.role || c.job] || CLINES.walker)); c.faceT = 3; sfx('click'); return true; }
 function scareOne(c, from, t) { if (c.job === 'guard') return; c.fleeT = t; c.from.set(from.x, 0, from.z); c.sit = false; if (Math.random() < 0.5) citizenSay(c, pick(['Aah!', 'Run!', 'Help!', 'Watch out!'])); }
 function scare(pos, r) { for (const c of citizens) if (!c.hidden && !c.dead && dist2(c.pos, pos) < r) scareOne(c, pos, 6); }
 
@@ -213,7 +213,7 @@ if (moveToward(c, c.tgt, 4.2, dt) || c.t % 3 < dt) { if (c.inst) c.tgt.copy(inst
       } else { c.alerted = false; if (moveToward(c, c.home, 3, dt)) { c.yaw = b.ry; animStand(c); c.aR.rotation.x = 0; } else animWalk(c, 3, dt, 0.8); }
       break;
     }
-    case 'commuter': animWalk(c, WALK_SP, dt, 0.85); break;
+    case 'commuter': if (c.stand) animStand(c); else animWalk(c, WALK_SP, dt, 0.85); break;
     case 'student': case 'suit': { if (moveToward(c, c.tgt, 1.6, dt) || c.t % 6 < dt) { if (c.inst) c.tgt.copy(instTgt(c)); } animWalk(c, 1.6, dt, 0.8); break; }
     case 'worker': c.lL.rotation.x = 0; c.lR.rotation.x = 0; c.aL.rotation.x = 0; c.aR.rotation.x = -1.1 + Math.sin(c.t * 12) * 0.6; if (Math.sin(c.t * 12) > 0.98 && dp < 25) sfxAt(c.pos, 'chop'); break;
     case 'vendor': animStand(c); c.aR.rotation.x = c.t % 6 < 1 ? -2.2 + Math.sin(c.t * 10) * 0.3 : 0; break;
