@@ -23,8 +23,9 @@ function updateSky(dt) {
   const day = Math.min(1, Math.max(0, (sy + 0.15) / 0.4)), dusk = Math.max(0, 1 - Math.abs(sy) / 0.3) * 0.6;
   cTmp.copy(cNight).lerp(cDay, day).lerp(cDusk, dusk);
   dayLight = day; scene.background.copy(cTmp); scene.fog.color.copy(cTmp);
-  sun.position.set(Math.sin(a) * 100, sy * 100 + 5, 30); sun.intensity = 0.05 + 1.15 * day;
+  sun.intensity = 0.05 + 1.15 * day;
   hemi.intensity = 0.28 + 0.82 * day;
+  skyTick(dt, day, dusk, sy, a);
   for (const k in matCache) matCache[k].emissiveIntensity = (1 - day) * 1.1;
   for (const m of FACMAT) m.emissiveIntensity = (1 - day) * 1.1; CARHEAD.emissiveIntensity = 0.4 + (1 - day) * 1.6; CARTAIL.emissiveIntensity = 0.35 + (1 - day) * 0.9; CARBEAM.opacity = (1 - day) * 0.3; for (const m of nightMats) m.emissiveIntensity = (1 - day) * 0.5;
 }
