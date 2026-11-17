@@ -11,7 +11,7 @@ function fxInit() {
   for (let i = 0; i < SMOKE_N; i++) { const m = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ color: 0xcfcfcf, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; scene.add(m); puffs.push({ m, t: 0, life: 0 }); }
 }
 function skidAt(x, z, h) { fxInit(); const m = skids[skidI++ % SKID_N]; m.position.set(x, 0.06, z); m.rotation.y = h; m.visible = true; }
-function smokeAt(x, z) { fxInit(); const p = puffs[smokeI++ % SMOKE_N]; p.t = 0; p.life = 0.9 + Math.random() * 0.4; p.m.position.set(x + (Math.random() - 0.5) * 0.4, 0.3, z + (Math.random() - 0.5) * 0.4); p.m.scale.setScalar(0.5); p.m.visible = true; p.m.material.opacity = 0.45; }
+function smokeAt(x, z, col = 0xcfcfcf) { fxInit(); const p = puffs[smokeI++ % SMOKE_N]; p.t = 0; p.life = 0.9 + Math.random() * 0.4; p.m.position.set(x + (Math.random() - 0.5) * 0.4, 0.3, z + (Math.random() - 0.5) * 0.4); p.m.scale.setScalar(0.5); p.m.visible = true; p.m.material.opacity = 0.45; p.m.material.color.setHex(col); }
 function carFxTick(dt) {
   for (const p of puffs) { if (!p.m.visible) continue; p.t += dt; if (p.t >= p.life) { p.m.visible = false; continue; } const k = p.t / p.life; p.m.position.y += dt * 1.1; p.m.scale.setScalar(0.5 + k * 1.8); p.m.material.opacity = 0.45 * (1 - k); }
 }
@@ -63,6 +63,8 @@ function carPhys(c, dt, thr, steer) {
   // skid marks + tyre smoke
   const slide = Math.abs(vl) > 3.2 || (hb && Math.abs(vf) > 5) || (thr > 0.1 && vf < 0 && vf > -0.5) || (a < -20 && vf > 8);
   c.sk -= dt; c.skid = slide;
+  c.dt2 = (c.dt2 || 0) - dt;
+  if (!slide && Math.abs(c.speed) > 7 && !onRoad(c.pos.x, c.pos.z, 7.5) && c.dt2 <= 0) { c.dt2 = 0.07; c.mesh.updateMatrixWorld(true); for (const w of c.wheels) if (!w.front) { w.pivot.getWorldPosition(_wp); smokeAt(_wp.x, _wp.z, 0x8a7a5a); } }
   if (slide && c.sk <= 0) {
     c.sk = 0.05; c.mesh.updateMatrixWorld(true);
     for (const w of c.wheels) { if (w.front && !(a < -20)) continue; w.pivot.getWorldPosition(_wp); skidAt(_wp.x, _wp.z, Math.atan2(c.vx, c.vz)); if (Math.random() < 0.5) smokeAt(_wp.x, _wp.z); }

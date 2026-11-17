@@ -36,6 +36,7 @@ function sfx(n, v = 1) {
     case 'npcplace': tone(520, 380, 0.05, 'triangle', 0.18 * v); break;
     case 'chop': noise(0.07, 0.35 * v, 700); tone(180, 120, 0.05, 'square', 0.12 * v); break;
     case 'mine': tone(1200, 700, 0.04, 'square', 0.12 * v); noise(0.05, 0.3 * v, 2500, 'highpass'); break;
+    case 'thunder': noise(1.8, 0.7 * v, 180); tone(70, 28, 1.4, 'sawtooth', 0.25 * v); break;
     case 'crash': noise(0.25, 0.6 * v, 600); tone(100, 40, 0.25, 'sawtooth', 0.3 * v); break;
     case 'siren': tone(600, 900, 0.35, 'sine', 0.2 * v); setTimeout(() => tone(900, 600, 0.35, 'sine', 0.2 * v), 350); break;
     case 'water': noise(0.22, 0.1 * v, 3500, 'highpass'); break;

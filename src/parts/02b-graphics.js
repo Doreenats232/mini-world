@@ -3,11 +3,11 @@ const GQ = { cur: isTouch ? 'low' : 'med', t: 0, flag: 0 };
 try { const q = localStorage.getItem('mw_q'); if (q === 'low' || q === 'med' || q === 'high') GQ.cur = q; } catch (e) {}
 const sunOff = new THREE.Vector3(60, 100, 30), _c1 = new THREE.Color(), _c2 = new THREE.Color();
 const SKYTOP = { n: new THREE.Color(0x02040c), d: new THREE.Color(0x2f6fc4), k: new THREE.Color(0x3a3f78) };
-const skyUni = { top: { value: new THREE.Color(0x2f6fc4) }, hor: { value: new THREE.Color(0x87ceeb) }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color(1, 0.9, 0.6) }, night: { value: 0 }, t: { value: 0 }, clouds: { value: 1 } };
+const skyUni = { top: { value: new THREE.Color(0x2f6fc4) }, hor: { value: new THREE.Color(0x87ceeb) }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color(1, 0.9, 0.6) }, night: { value: 0 }, t: { value: 0 }, clouds: { value: 1 }, cover: { value: 0 }, flash: { value: 0 } };
 const skyMat = new THREE.ShaderMaterial({
   uniforms: skyUni, side: THREE.BackSide, depthWrite: false, fog: false,
   vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position.z = gl_Position.w; }',
-  fragmentShader: `uniform vec3 top, hor, sunDir, sunCol; uniform float night, t, clouds; varying vec3 vD;
+  fragmentShader: `uniform vec3 top, hor, sunDir, sunCol; uniform float night, t, clouds, cover, flash; varying vec3 vD;
 float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y); }
 void main(){
@@ -19,12 +19,13 @@ void main(){
   if (clouds > 0.5 && y > 0.02) {
     vec2 p = d.xz / (y + 0.3) * 1.5 + vec2(t * 0.012, 0.0);
     float f = n(p) * 0.55 + n(p * 2.1) * 0.3 + n(p * 4.3) * 0.15;
-    float m = smoothstep(0.5, 0.78, f) * smoothstep(0.02, 0.18, y);
-    vec3 cc = mix(vec3(0.82, 0.86, 0.95), vec3(1.0), f) * (1.0 - night * 0.88);
+    float m = smoothstep(0.5 - 0.35 * cover, 0.78 - 0.3 * cover, f) * smoothstep(0.02, 0.18, y);
+    vec3 cc = mix(vec3(0.82, 0.86, 0.95), vec3(1.0), f) * (1.0 - night * 0.88) * (1.0 - 0.45 * cover);
     cc += sunCol * 0.18 * pow(sd, 5.0);
     c = mix(c, cc, m * 0.9);
   }
   if (night > 0.02 && y > 0.0) { vec2 sp = floor(d.xz / (y + 0.3) * 80.0); c += vec3(step(0.9972, h(sp)) * smoothstep(0.0, 0.25, y) * night); }
+  c += vec3(0.75, 0.8, 1.0) * flash * 0.8; c = mix(c, hor, cover * 0.35 * step(0.0, y));
   gl_FragColor = vec4(c, 1.0);
 }`
 });
@@ -64,6 +65,7 @@ function skyTick(dt, day, dusk, sy, a) {
   skyUni.night.value = 1 - day; skyUni.t.value += dt;
   sun.color.setRGB(1, 0.97 - 0.3 * dusk, 0.9 - 0.5 * dusk);
   skyMesh.position.copy(cam.position);
+  weatherTick(dt, day);
   if (GQ.cur !== 'low') { GQ.t -= dt; if (GQ.t <= 0) { GQ.t = 1.2; flagShadows(); } }
 }
 function flagShadows() {

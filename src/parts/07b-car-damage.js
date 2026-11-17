@@ -49,7 +49,7 @@ function explodeCar(c, byPlayer) {
   const p = new V3(c.pos.x, 1, c.pos.z);
   for (const col of [0xff7a1a, 0xffd23a, 0xff4d00, 0x555555, 0xffe9a0, 0x333333, 0xff7a1a, 0xffd23a]) spark(p, col);
   for (let i = 0; i < 12; i++) puff(p, i % 3 ? 0xff8a1f : 0x222222, 2 + Math.random() * 3, 0.9 + Math.random() * 0.6, 1.2 + Math.random() * 1.2, 0.85);
-  sfx('crash'); sfxAt(c.pos, 'edie'); scare(c.pos, 45);
+  boom(p, 1);   sfx('crash'); sfxAt(c.pos, 'edie'); scare(c.pos, 45);
   for (const e of [...enemies, ...cops]) if (!e.dead && dist2(e.pos, c.pos) < 8) damageEnemy(e, 90);
   for (const q of citizens) if (!q.hidden && !q.dead && dist2(q.pos, c.pos) < 6) { q.downT = 2; q.kv = new V3(q.pos.x - c.pos.x, 0, q.pos.z - c.pos.z).setLength(7); }
   for (const o of cars) if (o !== c && !o.dead && dist2(o.pos, c.pos) < 7) damageCar(o, 40, byPlayer);
