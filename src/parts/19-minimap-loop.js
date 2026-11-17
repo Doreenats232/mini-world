@@ -10,6 +10,7 @@ function drawMini() {
   mg.fillStyle = '#3a3a3d'; for (let k = -13; k <= 11; k++) { mg.fillRect(k * 50 + 18, -650, 14, 1300); mg.fillRect(-650, k * 50 + 18, 1300, 14); }
   mg.fillStyle = '#8a8f98';
   for (const b of cityFoot) { if (Math.abs((b.min.x + b.max.x) / 2 - px) > lim || Math.abs((b.min.z + b.max.z) / 2 - pz) > lim) continue; mg.fillRect(b.min.x, b.min.z, b.max.x - b.min.x, b.max.z - b.min.z); }
+  mapMiniRoute(mg, sc);
   mg.fillStyle = '#d4a85f';
   for (const m of blockMeshes.values()) { const x = m.position.x, z = m.position.z; if (Math.abs(x - px) > lim || Math.abs(z - pz) > lim) continue; mg.fillRect(x - 1, z - 1, 2, 2); }
   mg.setTransform(1, 0, 0, 1, 0, 0);
@@ -20,7 +21,7 @@ function drawMini() {
   for (const e of cops) if (!e.dead) dot(e.pos.x, e.pos.z, '#3b82f6', 6, false);
   for (const c of citizens) if (!c.hidden) dot(c.pos.x, c.pos.z, '#e8e8e8', 3, false);
   for (const r of net.remotes.values()) dot(r.pos.x, r.pos.z, '#00e5ff', 6, true);
-  dot(SHOP.x, SHOP.z, '#ffd400', 7, true);
+  mapMiniIcons(dot);
   for (const cr of cars) { const [sx, sy, inside] = toS(cr.pos.x, cr.pos.z); if (inside) { mg.fillStyle = '#fff'; mg.fillRect(sx - 4, sy - 4, 8, 8); } }
   for (const n of npcs) { const [sx, sy] = toS(n.pos.x, n.pos.z, true); mg.fillStyle = '#' + n.col.toString(16).padStart(6, '0'); mg.beginPath(); mg.arc(sx, sy, 8, 0, 6.2832); mg.fill(); mg.strokeStyle = '#fff'; mg.lineWidth = 2; mg.stroke(); mg.fillStyle = '#fff'; mg.font = 'bold 12px sans-serif'; mg.textAlign = 'center'; mg.fillText(n.name[0], sx, sy + 4); }
   mg.fillStyle = '#fff'; mg.beginPath(); mg.moveTo(c, c - 12); mg.lineTo(c - 8, c + 9); mg.lineTo(c + 8, c + 9); mg.closePath(); mg.fill();
@@ -39,7 +40,7 @@ let last = performance.now(), spawnT = 0;
 ren.setAnimationLoop(now => {
   const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
   cityT -= dt; if (cityT <= 0) { cityT = 0.3; updateCity(); }
-  updateSky(dt); updateUse(dt); updateCitizens(dt); instLife(dt); policeTick(dt); bankTick(dt); prisonTick(dt); updateResidents(dt); updateTraffic(dt); updateViewmodel(dt); updateFx(dt); updateCarFx(dt); updateSoldiers(dt);
+  updateSky(dt); updateUse(dt); updateCitizens(dt); instLife(dt); policeTick(dt); bankTick(dt); prisonTick(dt); gpsTick(dt); updateResidents(dt); updateTraffic(dt); updateViewmodel(dt); updateFx(dt); updateCarFx(dt); updateSoldiers(dt);
   { const pre = isTouch ? 'Tap DOOR: ' : 'Press E: '; let ht = ''; let carNear = null; if (!inCar) for (const c of cars) if (!c.dead && dist2(c.pos, P.pos) < 5) { carNear = c; break; } if (!inCar && !shopOpen) { if (shopNear()) ht = pre + 'open shop'; else { const u = nearestUse(); if (u) ht = pre + USEN[u.f]; else if (carNear) ht = pre + (carNear.bike ? 'get on bike' : 'open door'); else { const cz = nearestCitizen(); if (cz) ht = pre + 'talk to ' + cz.name + ' (' + (cz.label || cz.job) + ')'; } } } if (isTouch) { const cb = $('car'), want = !shopOpen && (inCar || !!ht); const lbl = inCar ? (inCar.bike ? 'OFF' : 'EXIT') : (carNear && !shopNear() && !nearestUse() ? 'DOOR' : 'USE'); if (cb._w !== want) { cb._w = want; cb.style.display = want ? 'flex' : 'none'; } if (cb._l !== lbl) { cb._l = lbl; cb.textContent = lbl; } } if (ht !== hintTxt) { hintTxt = ht; $('hint').textContent = ht; $('hint').style.display = ht ? 'block' : 'none'; } }
   miniT -= dt; if (miniT <= 0) { miniT = 0.066; drawMini(); }
   if (inCar) driveCar(dt); else if (enter) updateEnter(dt); else playerStep(dt);

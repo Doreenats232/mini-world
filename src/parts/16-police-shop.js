@@ -105,6 +105,6 @@ function renderShop() {
   }
 }
 function openShop() { shopOpen = true; for (const k in keys) keys[k] = false; document.exitPointerLock && document.exitPointerLock(); renderShop(); $('shop').style.display = 'block'; }
-function closeShop() { if (phoneOpen) { closePhone(); return; } shopOpen = false; $('shop').style.display = 'none'; }
+function closeShop() { if (phoneOpen) { closePhone(); return; } if (mapOpen) { closeMap(); return; } shopOpen = false; $('shop').style.display = 'none'; }
 $('shopclose').addEventListener('click', closeShop);
 
