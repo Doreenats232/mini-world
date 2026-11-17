@@ -21,18 +21,12 @@ function toggleCar() {
 function driveCar(dt) {
   if (inCar.bike) return driveBike(dt);
   const c = inCar, thr = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - joy.y, steer = (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) - joy.x;
-  if (Math.abs(thr) > 0.1) c.speed += thr * 18 * dt; else c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 8 * dt);
-  if (keys.Space) c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 25 * dt);
-  c.speed = Math.max(-8, Math.min(26 * (1 - 0.2 * c.flats), c.speed)); engine(Math.abs(c.speed));
-  c.h += steer * 1.8 * dt * Math.max(-1, Math.min(1, c.speed / 5)) * (1 - 0.15 * c.flats) + c.pull * 0.14 * dt * Math.min(1, Math.abs(c.speed) / 8);
-  const t = { pos: new V3(c.pos.x + Math.sin(c.h) * c.speed * dt, 0, c.pos.z + Math.cos(c.h) * c.speed * dt), R: 1.3, H: 1.2 };
-  let bad = false; for (const b of solids.values()) if (hit(t, b)) { bad = true; break; }
-  let rammed = null; for (const o of cars) if (o !== c && dist2(o.pos, t.pos) < 2.8) { bad = true; rammed = o; }
-  if (bad) { if (Math.abs(c.speed) > 8) { damageCar(c, Math.abs(c.speed) * 1.4); if (rammed) damageCar(rammed, Math.abs(c.speed) * 2.2, true); } if (Math.abs(c.speed) > 12) crime(1, 'reckless driving', 'crash', 1); if (Math.abs(c.speed) > 4) sfx('crash'); c.speed *= -0.3; } else c.pos.copy(t.pos);
-  c.mesh.position.copy(c.pos); c.mesh.rotation.y = c.h; animCar(c, dt, steer, thr);
+  carPhys(c, dt, thr, steer);
   if (Math.abs(c.speed) > 6) for (const e of [...enemies, ...cops]) if (!e.dead && dist2(e.pos, c.pos) < 2.3) damageEnemy(e, 100);
   P.pos.copy(c.pos);
-  cam.position.set(c.pos.x - Math.sin(c.h) * 7.5, 3.8, c.pos.z - Math.cos(c.h) * 7.5); cam.lookAt(c.pos.x, 1.2, c.pos.z);
+  { let d = c.h - c.camA; d = Math.atan2(Math.sin(d), Math.cos(d)); c.camA += d * Math.min(1, dt * 4); const sp = Math.min(1, Math.abs(c.speed) / 26), back = 7.5 + sp * 1.5;
+    cam.position.set(c.pos.x - Math.sin(c.camA) * back, 3.8 + sp * 0.4, c.pos.z - Math.cos(c.camA) * back); cam.lookAt(c.pos.x, 1.2, c.pos.z);
+    const fov = 70 + sp * 10; if (Math.abs(cam.fov - fov) > 0.2) { cam.fov += (fov - cam.fov) * Math.min(1, dt * 4); cam.updateProjectionMatrix(); } }
 }
 
 function driveBike(dt) {

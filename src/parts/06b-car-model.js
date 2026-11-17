@@ -52,10 +52,10 @@ function mkCarModel(typeName, col, driver) {
   g.add(new THREE.Mesh(new THREE.PlaneGeometry(2.6, 6).rotateX(-Math.PI / 2).translate(0, 0.05, L / 2 + 3.3), CARBEAM), new THREE.Mesh(new THREE.PlaneGeometry(W + 0.5, L + 0.5).rotateX(-Math.PI / 2).translate(0, 0.045, 0), CARSHADOW));
   return { g, body: bodyG, wheels, wr, hood, trunk, doors };
 }
-function animCar(c, dt, steer, thr) {
+function animCar(c, dt, steer, thr, pT, rT, hb) {
   c.spin += c.speed * dt / c.wr; c.steerV += ((steer || 0) - c.steerV) * Math.min(1, dt * 8);
-  for (const w of c.wheels) { w.spin.rotation.x = c.spin; if (w.front) w.pivot.rotation.y = Math.max(-0.5, Math.min(0.5, c.steerV * 0.45)); }
-  const k = Math.min(1, dt * 5); c.body.rotation.x += (-(thr || 0) * 0.02 - c.body.rotation.x) * k; c.body.rotation.z += (-c.steerV * Math.min(1, Math.abs(c.speed) / 15) * 0.05 - c.body.rotation.z) * k;
+  for (const w of c.wheels) { if (!(hb && !w.front)) w.spin.rotation.x = c.spin; if (w.front) w.pivot.rotation.y = Math.max(-0.55, Math.min(0.55, c.steerV * 0.45)); }
+  const k = Math.min(1, dt * 5); c.body.rotation.x += ((pT !== undefined ? pT : -(thr || 0) * 0.02) - c.body.rotation.x) * k; c.body.rotation.z += ((rT !== undefined ? rT : -c.steerV * Math.min(1, Math.abs(c.speed) / 15) * 0.05) - c.body.rotation.z) * k;
 }
 
 // ---------- rideable bike ----------
