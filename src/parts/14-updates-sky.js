@@ -26,6 +26,7 @@ function updateSky(dt) {
   sun.intensity = 0.05 + 1.15 * day;
   hemi.intensity = 0.28 + 0.82 * day;
   skyTick(dt, day, dusk, sy, a);
+  lampUpdate(day);
   for (const k in matCache) matCache[k].emissiveIntensity = (1 - day) * 1.1;
   for (const m of FACMAT) m.emissiveIntensity = (1 - day) * 1.1; CARHEAD.emissiveIntensity = 0.4 + (1 - day) * 1.6; CARTAIL.emissiveIntensity = 0.35 + (1 - day) * 0.9; CARBEAM.opacity = (1 - day) * 0.3; for (const m of nightMats) m.emissiveIntensity = (1 - day) * 0.5;
 }

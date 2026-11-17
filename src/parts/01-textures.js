@@ -33,10 +33,19 @@ function sideMat(v, wm, hm) {
   return matCache[k];
 }
 const roofTop = new THREE.MeshLambertMaterial({ map: mkTex(64, 64, (g, w, h) => { g.fillStyle = '#6a6c70'; g.fillRect(0, 0, w, h); speck(g, w, h, 500, 'rgba(255,255,255,.1)', 'rgba(0,0,0,.15)'); }) });
-const grassTex = mkTex(256, 256, (g, w, h) => { g.fillStyle = '#4b7d3a'; g.fillRect(0, 0, w, h); for (let i = 0; i < 2500; i++) { g.fillStyle = `hsl(${rr(88, 108)},${rr(35, 50)}%,${rr(26, 40)}%)`; g.fillRect(Math.random() * w, Math.random() * h, 2, 3); } });
+const grassTex = mkTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#4b7d3a'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26; i++) { g.fillStyle = `hsla(${rr(80, 112)},${rr(30, 50)}%,${rr(24, 40)}%,.28)`; g.beginPath(); g.arc(Math.random() * w, Math.random() * h, rr(14, 40), 0, 6.3); g.fill(); }
+  for (let i = 0; i < 3200; i++) { g.fillStyle = `hsl(${rr(86, 110)},${rr(35, 55)}%,${rr(24, 44)}%)`; g.fillRect(Math.random() * w, Math.random() * h, 1.5, rr(2, 4)); }
+  for (let i = 0; i < 60; i++) { g.fillStyle = Math.random() < 0.6 ? 'rgba(255,255,255,.7)' : 'rgba(255,230,90,.75)'; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+});
 grassTex.repeat.set(300, 300);
 const roadTex = mkTex(128, 256, (g, w, h) => {
-  g.fillStyle = '#2e2e31'; g.fillRect(0, 0, w, h); speck(g, w, h, 1500, 'rgba(255,255,255,.07)', 'rgba(0,0,0,.2)');
+  g.fillStyle = '#303033'; g.fillRect(0, 0, w, h); speck(g, w, h, 2200, 'rgba(255,255,255,.08)', 'rgba(0,0,0,.22)');
+  for (let i = 0; i < 7; i++) { g.fillStyle = `rgba(${rr(0, 25)},${rr(0, 25)},${rr(0, 30)},.18)`; g.fillRect(rr(10, w - 40), rr(0, h - 30), rr(14, 36), rr(10, 30)); }   // patched asphalt
+  g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(w * 0.18, 0, 14, h); g.fillRect(w * 0.64, 0, 14, h);                                                           // worn tyre tracks
+  for (let i = 0; i < 4; i++) { g.fillStyle = 'rgba(10,8,6,.35)'; g.beginPath(); g.ellipse(rr(20, w - 20), rr(0, h), rr(3, 7), rr(5, 10), 0, 0, 6.3); g.fill(); }  // oil stains
+  g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 1; for (let i = 0; i < 10; i++) { let x = rr(8, w - 8), y = rr(0, h); g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 6; k++) { x += rr(-6, 6); y += rr(4, 14); g.lineTo(x, y); } g.stroke(); }  // cracks
   g.fillStyle = '#dcdcdc'; g.fillRect(6, 0, 3, h); g.fillRect(w - 9, 0, 3, h);
   g.fillStyle = '#e8c41c'; for (let y = 0; y < h; y += 80) g.fillRect(w / 2 - 2, y, 4, 40);
   g.fillStyle = '#555'; g.fillRect(0, 0, 2, h); g.fillRect(w - 2, 0, 2, h);
