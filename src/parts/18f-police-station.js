@@ -21,8 +21,8 @@ function endMission(b, rt, cool) { b.mis = null; b.cool = cool; if (b.pcar && b.
 function policeTick(dt) {
   for (const b of institutions) {
     if (b.purpose !== 'police') continue;
-    if (Math.hypot(b.x - P.pos.x, b.z - P.pos.z) > 200) continue;
-    if (!b.beacon) { const m = [new THREE.MeshBasicMaterial({ color: 0x330000 }), new THREE.MeshBasicMaterial({ color: 0x000033 })], g = new THREE.Group(); const r = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.8), m[0]), bl = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.8), m[1]); r.position.set(-0.6, 0, 0); bl.position.set(0.6, 0, 0); g.add(r, bl); g.position.set(b.x, b.h + 0.4, b.z); scene.add(g); b.beacon = m; b.beaconG = g; }
+    const far = Math.hypot(b.x - P.pos.x, b.z - P.pos.z) > 200; if (far && !b.mis) continue;
+    if (!b.beacon && !far) { const m = [new THREE.MeshBasicMaterial({ color: 0x330000 }), new THREE.MeshBasicMaterial({ color: 0x000033 })], g = new THREE.Group(); const r = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.8), m[0]), bl = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.8), m[1]); r.position.set(-0.6, 0, 0); bl.position.set(0.6, 0, 0); g.add(r, bl); g.position.set(b.x, b.h + 0.4, b.z); scene.add(g); b.beacon = m; b.beaconG = g; }
     b.respawn = Math.max(0, (b.respawn || 0) - dt); b.cool = Math.max(0, (b.cool || 0) - dt);
     if (b.pcar && b.pcar === inCar) { if (!b.stolen) { b.stolen = true; crime(1, 'stole a police car', 'pcar'); } b.mis = b.mis && b.mis.e && (b.mis.e.arrested = false, null); }
     else if (b.pcar && (b.stolen || !cars.includes(b.pcar))) { b.pcar = null; b.stolen = false; b.mis = null; b.respawn = 90; }
@@ -33,7 +33,7 @@ function policeTick(dt) {
     if (!m) {
       if (b.cool > 0) continue; let best = null, bd = 1e9;
       for (const e of enemies.concat(thieves)) { if (e.dead || e.arrested || e.hp <= 0 || (e.hidden && !e.robbed)) continue; const d = Math.hypot(e.pos.x - b.x, e.pos.z - b.z); if (d < (e.job === 'thief' ? 260 : 90) && d < bd) { bd = d; best = e; } }
-      if (best) { const dst = nearestBld(best.pos, b) || b; b.mis = { st: 'go', el: 0, t: 0, rt: buildRoute(b, dst), e: best, off: null, sirenT: 0 }; }
+      if (best) { const dst = nearestBld(best.pos, b) || b; b.mis = { st: 'go', el: 0, t: 0, rt: buildRoute(b, dst), dst, e: best, off: null, sirenT: 0 }; }
       continue;
     }
     const c = b.pcar, e = m.e;
@@ -49,7 +49,16 @@ function policeTick(dt) {
       const o = m.off; if (o.dead) { m.off = null; m.st = 'return'; m.el = 0; continue; }
       const left = stepToward(o.pos, c.pos.x, c.pos.z, 3.4, dt), dx = c.pos.x - o.pos.x, dz = c.pos.z - o.pos.z, dl = Math.hypot(dx, dz) || 1; o.yaw = Math.atan2(dx, dz);
       if (!e.dead && e.hp !== 0) { e.pos.x = o.pos.x - dx / dl * 1.3; e.pos.z = o.pos.z - dz / dl * 1.3; if (e.mesh) { e.mesh.position.copy(e.pos); e.mesh.rotation.y = o.yaw; } else e.yaw = o.yaw; }
-      if (left < 2.5) { if (!e.dead && e.hp !== 0) { dropPrisoner(e); b.booked = (b.booked || 0) + 1; } removeCitizen(o); m.off = null; m.st = 'return'; m.el = 0; }
+      if (left < 2.5) {
+        const real = !e.dead && e.hp !== 0, kind = e.job === 'thief' ? 'robber' : 'thug'; if (real) { dropPrisoner(e); b.booked = (b.booked || 0) + 1; }
+        removeCitizen(o); m.off = null; m.el = 0; const pr = institutions.find(x => x.purpose === 'prison');
+        if (real && pr) { m.pr = pr; m.kind = kind; m.rt2 = buildRoute(m.dst, pr); m.st = 'toPrison'; } else m.st = 'return';
+      }
+    } else if (m.st === 'toPrison') {
+      m.el += dt; placePatrol(b, m.rt2, m.el, false, dt); m.sirenT -= dt; if (m.sirenT <= 0) { m.sirenT = 3; sfxAt(c.pos, 'horn'); }
+      if (m.el >= m.rt2.T) { addInmate(m.pr, m.kind); m.rt3 = buildRoute(m.pr, b); m.st = 'back2'; m.el = 0; }
+    } else if (m.st === 'back2') {
+      m.el += dt; placePatrol(b, m.rt3, m.el, false, dt); if (m.el >= m.rt3.T) endMission(b, m.rt3, 40);
     } else {
       m.el += dt; placePatrol(b, m.rt, m.rt.T - m.el, true, dt); if (m.el >= m.rt.T) endMission(b, m.rt, 40);
     }

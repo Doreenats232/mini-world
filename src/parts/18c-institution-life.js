@@ -1,5 +1,5 @@
 // ---- life at the institutions: school day (class / break / home time), gates, guards, students, staff ----
-const INST_JOBS = { school: ['kid', 6], university: ['student', 6], company: ['suit', 3], nasa: ['suit', 4], police: ['suit', 0], bank: ['suit', 0] };
+const INST_JOBS = { school: ['kid', 6], university: ['student', 6], company: ['suit', 3], nasa: ['suit', 4], police: ['suit', 0], bank: ['suit', 0], prison: ['suit', 0] };
 let instT = 0;
 function instTgt(c) {
   const b = c.inst, ox = Math.sin(b.ry), oz = Math.cos(b.ry), tx = Math.cos(b.ry), tz = -Math.sin(b.ry), u = (Math.random() - 0.5) * 12, o = Math.random() * 2;
@@ -44,6 +44,7 @@ function instLife(dt) {
       if (!b.guard || b.guard.dead) { const g = mkCitizen('guard', b.post.x, b.post.z, b.ry, { home: new V3(b.post.x, 0, b.post.z), isStatic: true, inst: b }); g.aR.add(prop([cbox(0.06, 0.5, 0.06, 0.05, -0.75, 0.3, 0x111111)])); b.guard = g; }
       if (ph === 'class' || ph === 'closed') continue;
     }
+    if (b.purpose === 'prison') { prisonLife(b); continue; }
     const [job, n] = INST_JOBS[b.purpose]; if (b.crowd.length >= n) continue;
     const half = (b.ry === 0 || b.ry === Math.PI) ? b.d / 2 : b.w / 2, hx = b.x + Math.sin(b.ry) * (half + 2.5), hz = b.z + Math.cos(b.ry) * (half + 2.5);
     const c = mkCitizen(job, hx, hz, b.ry, { home: new V3(hx, 0, hz), tgt: new V3(hx, 0, hz), isStatic: true, inst: b }); b.crowd.push(c);

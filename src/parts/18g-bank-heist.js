@@ -34,9 +34,10 @@ function bankTick(dt) {
   for (const b of institutions) {
     if (b.purpose !== 'bank') continue; const dP = Math.hypot(b.x - P.pos.x, b.z - P.pos.z);
     b.alarm = Math.max(0, (b.alarm || 0) - dt); if (b.alarm > 0 && dP < 150) { b.alT = (b.alT || 0) - dt; if (b.alT <= 0) { b.alT = 2.2; sfxAt(doorPt(b), 'horn'); } }
+    if (dP > 420 && b.heist) { for (const t of b.heist.ts) { if (thieves.includes(t)) { removeCitizen(t); dropThief(t); } } b.heist = null; b.alarm = 0; b.heistT = 60 + Math.random() * 60; continue; }
     if (dP > 260) continue;
     if (b.heist) { updateHeist(b, dt); continue; }
     b.heistT = (b.heistT === undefined ? 20 + Math.random() * 40 : b.heistT) - dt;
-    if (b.heistT <= 0 && dayLight > 0.3 && thieves.length < 4 && citizens.length < (isTouch ? 40 : 90)) startHeist(b);
+    if (b.heistT <= 0 && dayLight > 0.3 && thieves.filter(t => Math.hypot(t.pos.x - P.pos.x, t.pos.z - P.pos.z) < 260).length < 4 && citizens.length < (isTouch ? 40 : 90)) startHeist(b);
   }
 }

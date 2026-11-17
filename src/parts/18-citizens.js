@@ -13,6 +13,7 @@ const CLINES = {
   vendor: ['Fresh fruit! Get your fruit!', 'Best prices in town!', 'Come and look, friend!', 'Apples, bananas, mangoes!'],
   chatter: ['Did you hear about the new tower?', 'Haha, no way!', 'And then he said...', "That's what I told him."],
   sitter: ['Just resting my feet.', 'Nice spot for a break.', 'Watching the town go by.'],
+  inmate: ['I didn\'t do it!', 'Let me out of here...', 'The food is terrible.', 'Do you have a cigarette?'],
   thief: ['Get lost!', 'Mind your own business.', 'Nothing to see here.'],
   officer: ['Police! Stay calm.', 'You are under arrest.', 'Keep the streets safe.'],
   teacher: ['Open your books to page ten.', 'Who knows the answer?', 'Quiet, please!', 'Homework is due tomorrow.'],
@@ -64,6 +65,7 @@ function outfit(job) {
   if (job === 'shopper') o.bag = pick([0xc0392b, 0x2980b9, 0xf1c40f, 0xecf0f1]);
   if (job === 'cyclist') Object.assign(o, { hat: pick([0xff4d4d, 0x4dd2ff, 0xf1c40f]), pack: 0 });
   if (job === 'sweeper') Object.assign(o, { hat: 0x2ecc71, vest: 0x2ecc71, pack: 0 });
+  if (job === 'inmate') Object.assign(o, { shirt: 0xe67e22, pants: 0xe67e22, hat: 0, pack: 0, glasses: false });
   if (job === 'thief') Object.assign(o, { hat: 0x111111, shirt: 0x151515, pants: 0x1a1a1a, pack: 0, glasses: true });
   if (job === 'officer') Object.assign(o, { hat: 0x0b1d4a, shirt: 0x1d3a8a, pants: 0x14213d, pack: 0, glasses: false });
   if (job === 'teacher') Object.assign(o, { glasses: true, shirt: 0x8e6bbf, pants: 0x3b3b4f, hat: 0, pack: 0 });
@@ -220,7 +222,7 @@ if (moveToward(c, c.tgt, 4.2, dt) || c.t % 3 < dt) { if (c.inst) c.tgt.copy(inst
       break;
     }
     case 'commuter': if (c.stand) animStand(c); else animWalk(c, WALK_SP, dt, 0.85); break;
-    case 'student': case 'suit': { if (moveToward(c, c.tgt, 1.6, dt) || c.t % 6 < dt) { if (c.inst) c.tgt.copy(instTgt(c)); } animWalk(c, 1.6, dt, 0.8); break; }
+    case 'student': case 'suit': case 'inmate': { if (moveToward(c, c.tgt, 1.6, dt) || c.t % 6 < dt) { if (c.inst) c.tgt.copy(instTgt(c)); } animWalk(c, 1.6, dt, 0.8); break; }
     case 'worker': c.lL.rotation.x = 0; c.lR.rotation.x = 0; c.aL.rotation.x = 0; c.aR.rotation.x = -1.1 + Math.sin(c.t * 12) * 0.6; if (Math.sin(c.t * 12) > 0.98 && dp < 25) sfxAt(c.pos, 'chop'); break;
     case 'vendor': animStand(c); c.aR.rotation.x = c.t % 6 < 1 ? -2.2 + Math.sin(c.t * 10) * 0.3 : 0; break;
     case 'busker': animStand(c); c.aR.rotation.x = -0.6 + Math.sin(c.t * 8) * 0.25; c.aL.rotation.x = -0.9; if (dp < 22 && (c.noteT = (c.noteT || 0) - dt) <= 0) { c.noteT = 0.4 + Math.random() * 0.3; sfx('note', Math.max(0, 1 - dp / 22)); } break;

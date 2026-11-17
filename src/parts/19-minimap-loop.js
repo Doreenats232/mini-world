@@ -39,7 +39,7 @@ let last = performance.now(), spawnT = 0;
 ren.setAnimationLoop(now => {
   const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
   cityT -= dt; if (cityT <= 0) { cityT = 0.3; updateCity(); }
-  updateSky(dt); updateUse(dt); updateCitizens(dt); instLife(dt); policeTick(dt); bankTick(dt); updateResidents(dt); updateTraffic(dt); updateViewmodel(dt); updateFx(dt); updateCarFx(dt); updateSoldiers(dt);
+  updateSky(dt); updateUse(dt); updateCitizens(dt); instLife(dt); policeTick(dt); bankTick(dt); prisonTick(dt); updateResidents(dt); updateTraffic(dt); updateViewmodel(dt); updateFx(dt); updateCarFx(dt); updateSoldiers(dt);
   { const pre = isTouch ? 'Tap DOOR: ' : 'Press E: '; let ht = ''; let carNear = null; if (!inCar) for (const c of cars) if (!c.dead && dist2(c.pos, P.pos) < 5) { carNear = c; break; } if (!inCar && !shopOpen) { if (shopNear()) ht = pre + 'open shop'; else { const u = nearestUse(); if (u) ht = pre + USEN[u.f]; else if (carNear) ht = pre + (carNear.bike ? 'get on bike' : 'open door'); else { const cz = nearestCitizen(); if (cz) ht = pre + 'talk to ' + cz.name + ' (' + (cz.label || cz.job) + ')'; } } } if (isTouch) { const cb = $('car'), want = !shopOpen && (inCar || !!ht); const lbl = inCar ? (inCar.bike ? 'OFF' : 'EXIT') : (carNear && !shopNear() && !nearestUse() ? 'DOOR' : 'USE'); if (cb._w !== want) { cb._w = want; cb.style.display = want ? 'flex' : 'none'; } if (cb._l !== lbl) { cb._l = lbl; cb.textContent = lbl; } } if (ht !== hintTxt) { hintTxt = ht; $('hint').textContent = ht; $('hint').style.display = ht ? 'block' : 'none'; } }
   miniT -= dt; if (miniT <= 0) { miniT = 0.066; drawMini(); }
   if (inCar) driveCar(dt); else if (enter) updateEnter(dt); else playerStep(dt);
