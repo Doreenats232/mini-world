@@ -66,6 +66,7 @@ function useIt(u) {
   else if (f === 'toilet') sfx('flush');
   else if (f === 'fridge') { u.st = u.st ? 0 : 1; sfx('click'); }
   else if (f === 'stove') { u.st = u.st ? 0 : 1; ud.burn.forEach(m => m.color.setHex(u.st ? 0xff4422 : 0x222222)); sfx('click'); if (u.st) sfx('sizzle'); }
+  else if (f === 'elevcall') elevCall(u.owner, u.k);
   else if (f === 'bed') { dayT = 0.27; msg('You slept. Good morning!', 2200); sfx('click'); }
 }
 function tryUse() { const u = nearestUse(); if (!u) return false; useIt(u); return true; }
@@ -92,7 +93,7 @@ function mkCityDoor(b) {
 function spawnInterior(b) {
   let sd = (b.id * 7919 + 13) % 2147483647 || 1; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
   const kind = b.purpose ? ({ school: 'school', university: 'school', company: 'office', nasa: 'office', police: 'office', bank: 'office', prison: 'office' })[b.purpose] : ['home', 'office', 'store', 'cafe'][Math.floor(r() * 4)], groups = [], PI = Math.PI, crowd = [];
-  const put = (type, x, z, rot) => { const g = new THREE.Group(); mkFurn(type, g); g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g); groups.push(g); if (USEF.has(type)) regUse(g, type, b); };
+  const put = (type, x, z, rot) => { if (b.shaft && x > b.shaft.x0 - 1 && x < b.shaft.x1 + 1 && z > b.shaft.z0 - 1 && z < b.shaft.z1 + 1) return; const g = new THREE.Group(); mkFurn(type, g); g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g); groups.push(g); if (USEF.has(type)) regUse(g, type, b); };
   const slots = [];
   for (const sr of [0, PI / 2, PI, -PI / 2]) {
     const sx = Math.round(Math.sin(sr)), sz = Math.round(Math.cos(sr)), tx = Math.round(Math.cos(sr)), tz = -Math.round(Math.sin(sr));
@@ -112,10 +113,11 @@ function spawnInterior(b) {
   if (kind === 'school') {} else if (Math.min(b.w, b.d) >= 9) {
     if (kind === 'home') { put('rug', b.x, b.z, 0); set(b.x, b.z); } else if (kind === 'office') { set(b.x - 2.5, b.z); set(b.x + 2.5, b.z + 1.5); } else if (kind === 'cafe') { set(b.x - 2.2, b.z); set(b.x + 2.2, b.z); } else put('table', b.x, b.z, 0);
   }
-  b.int = { groups, crowd, door: mkCityDoor(b) };
+  b.int = { groups, crowd, door: mkCityDoor(b), slots: slots.slice() };
+  if (b.floors >= 2 && b.shaft) b.int.elev = mkElevator(b, groups);
 }
 function despawnInterior(b) {
-  const it = b.int; if (!it) return; for (const c of it.crowd || []) removeCitizen(c);
+  const it = b.int; if (!it) return; if (it.elev) elevDispose(it.elev); for (const c of it.crowd || []) removeCitizen(c);
   for (const g of it.groups) { scene.remove(g); g.traverse(m => { if (m.isMesh) m.geometry.dispose(); }); }
   unregOwner(b); const d = it.door; solids.delete('d' + d.k); const i = doors.indexOf(d); if (i >= 0) doors.splice(i, 1); scene.remove(d.grp); b.int = null;
 }

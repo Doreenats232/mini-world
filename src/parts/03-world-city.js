@@ -17,6 +17,15 @@ const CT = 0.8, CG = 4, CDW = 2.4, CDH = 3.0;
 function buildShell(b) {
   const cx = b.x, cz = b.z, w = b.w, d = b.d, h = b.h, PI = Math.PI;
   const L = { fac: [], roof: [], wall: [], floor: [], ceil: [], frame: [] }, boxes = [];
+  // tall generic buildings get real upper floors (slabs) with an elevator shaft in the back corner
+  const nF = (!b.purpose && h >= 8) ? Math.floor(h / CG) : 1; b.floors = nF; b.shaft = null;
+  if (nF >= 2) {
+    const ewD = b.ry === 0 || b.ry === PI, n0x = Math.round(Math.sin(b.ry)), n0z = Math.round(Math.cos(b.ry)), t0x = Math.round(Math.cos(b.ry)), t0z = -Math.round(Math.sin(b.ry)), Lw0 = ewD ? w : d, hf0 = ewD ? d / 2 : w / 2;
+    const hx = cx - n0x * (hf0 - CT - 1.75) + t0x * (Lw0 / 2 - CT - 1.75), hz = cz - n0z * (hf0 - CT - 1.75) + t0z * (Lw0 / 2 - CT - 1.75);
+    const S = b.shaft = { x0: hx - 1.75, x1: hx + 1.75, z0: hz - 1.75, z1: hz + 1.75 }, ix0 = cx - w / 2 + CT, ix1 = cx + w / 2 - CT, iz0 = cz - d / 2 + CT, iz1 = cz + d / 2 - CT;
+    const sl = (x0, x1, z0, z1, y) => { if (x1 - x0 < 0.05 || z1 - z0 < 0.05) return; const g = new THREE.BoxGeometry(x1 - x0, 0.3, z1 - z0), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (x1 - x0) / 2, uv.getY(i) * (z1 - z0) / 2); g.translate((x0 + x1) / 2, y - 0.15, (z0 + z1) / 2); L.floor.push(g); boxes.push(new THREE.Box3(new V3(x0, y - 0.3, z0), new V3(x1, y, z1))); };
+    for (let k = 1; k < nF; k++) { const y = k * CG; sl(ix0, S.x0, iz0, iz1, y); sl(S.x1, ix1, iz0, iz1, y); sl(S.x0, S.x1, iz0, S.z0, y); sl(S.x0, S.x1, S.z1, iz1, y); }
+  }
   const quad = (list, qw, qh, px, py, pz, ry, ru, rv) => { const g = new THREE.PlaneGeometry(qw, qh), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * ru, uv.getY(i) * rv); g.rotateY(ry); g.translate(px, py, pz); list.push(g); };
   const flat = (list, fw, fd, y, rx, ru, rv) => { const g = new THREE.PlaneGeometry(fw, fd), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * ru, uv.getY(i) * rv); g.rotateX(rx); g.translate(cx, y, cz); list.push(g); };
   for (const ry of [0, PI / 2, PI, -PI / 2]) {
@@ -26,7 +35,7 @@ function buildShell(b) {
     for (const [u0, u1, y0, y1] of pieces) {
       const uc = (u0 + u1) / 2, len = u1 - u0;
       quad(L.fac, len, y1 - y0, cx + nx * half + tx * uc, (y0 + y1) / 2, cz + nz * half + tz * uc, ry, Math.max(1, Math.round(len / 8)), Math.max(1, Math.round((y1 - y0) / 8)));
-      const iy1 = Math.min(y1, CG);
+      const iy1 = nF >= 2 ? y1 : Math.min(y1, CG);
       if (iy1 > y0) quad(L.wall, len, iy1 - y0, cx + nx * (half - CT) + tx * uc, (y0 + iy1) / 2, cz + nz * (half - CT) + tz * uc, ry + PI, Math.max(1, Math.round(len / 3)), Math.max(1, Math.round((iy1 - y0) / 3)));
       const ax = cx + nx * half + tx * u0, az = cz + nz * half + tz * u0, bx2 = cx + nx * (half - CT) + tx * u1, bz2 = cz + nz * (half - CT) + tz * u1;
       boxes.push(new THREE.Box3(new V3(Math.min(ax, bx2), y0, Math.min(az, bz2)), new V3(Math.max(ax, bx2), y1, Math.max(az, bz2))));
@@ -36,7 +45,7 @@ function buildShell(b) {
       fr(0.2, CDH, CT + 0.06, -CDW / 2 - 0.1, CDH / 2); fr(0.2, CDH, CT + 0.06, CDW / 2 + 0.1, CDH / 2); fr(CDW + 0.4, 0.2, CT + 0.06, 0, CDH + 0.1);
     }
   }
-  flat(L.roof, w, d, h + 0.02, -PI / 2, w / 4, d / 4); flat(L.floor, w - 2 * CT, d - 2 * CT, 0.03, -PI / 2, w / 2, d / 2); flat(L.ceil, w - 2 * CT, d - 2 * CT, CG, PI / 2, w / 4, d / 4);
+  flat(L.roof, w, d, h + 0.02, -PI / 2, w / 4, d / 4); flat(L.floor, w - 2 * CT, d - 2 * CT, 0.03, -PI / 2, w / 2, d / 2); flat(L.ceil, w - 2 * CT, d - 2 * CT, nF >= 2 ? h - 0.51 : CG, PI / 2, w / 4, d / 4);
   boxes.push(new THREE.Box3(new V3(cx - w / 2, h - 0.5, cz - d / 2), new V3(cx + w / 2, h, cz + d / 2)));
   const geos = [], mats = [], add = (list, mat) => { if (list.length) { geos.push(list.length === 1 ? list[0] : mergeGeometries(list, false)); mats.push(mat); } };
   add(L.fac, FACMAT[b.v]); add(L.roof, roofTop); add(L.wall, INTWALL[b.iv]); add(L.floor, FLOORMAT[b.fv]); add(L.ceil, CEILMAT); add(L.frame, FRAMEMAT);
