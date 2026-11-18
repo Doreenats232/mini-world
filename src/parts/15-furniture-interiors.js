@@ -92,7 +92,7 @@ function mkCityDoor(b) {
 }
 function spawnInterior(b) {
   let sd = (b.id * 7919 + 13) % 2147483647 || 1; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
-  const kind = b.purpose ? ({ school: 'school', university: 'school', company: 'office', nasa: 'office', police: 'office', bank: 'office', prison: 'office' })[b.purpose] : ['home', 'office', 'store', 'cafe'][Math.floor(r() * 4)], groups = [], PI = Math.PI, crowd = [];
+  const kind = b.purpose ? ({ school: 'school', university: 'school', company: 'office', nasa: 'office', police: 'office', bank: 'office', prison: 'prison' })[b.purpose] : ['home', 'office', 'store', 'cafe'][Math.floor(r() * 4)], groups = [], PI = Math.PI, crowd = [];
   const put = (type, x, z, rot) => { if (b.shaft && x > b.shaft.x0 - 1 && x < b.shaft.x1 + 1 && z > b.shaft.z0 - 1 && z < b.shaft.z1 + 1) return; const g = new THREE.Group(); mkFurn(type, g); g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g); groups.push(g); if (USEF.has(type)) regUse(g, type, b); };
   const slots = [];
   for (const sr of [0, PI / 2, PI, -PI / 2]) {
@@ -101,7 +101,7 @@ function spawnInterior(b) {
     for (let u = -Lw / 2 + 2.9; u <= Lw / 2 - 2.9; u += 2.3) { if (sr === b.ry && Math.abs(u) < 2.6) continue; slots.push({ x: b.x + sx * (half - CT - 0.95) + tx * u, z: b.z + sz * (half - CT - 0.95) + tz * u, rot: sr + PI }); }
   }
   for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
-  const WALL = { home: ['bed', 'fridge', 'stove', 'sink', 'shelf', 'toilet', 'tub', 'lamp', 'plant', 'bed'], office: ['shelf', 'shelf', 'plant', 'lamp', 'shelf', 'sink', 'toilet', 'plant'], store: ['shelf', 'shelf', 'shelf', 'shelf', 'fridge', 'plant', 'lamp', 'shelf'], cafe: ['stove', 'fridge', 'sink', 'shelf', 'plant', 'lamp', 'toilet', 'plant'], school: ['shelf', 'shelf', 'plant', 'lamp', 'shelf', 'toilet', 'sink', 'plant'] }[kind];
+  const WALL = { prison: [], home: ['bed', 'fridge', 'stove', 'sink', 'shelf', 'toilet', 'tub', 'lamp', 'plant', 'bed'], office: ['shelf', 'shelf', 'plant', 'lamp', 'shelf', 'sink', 'toilet', 'plant'], store: ['shelf', 'shelf', 'shelf', 'shelf', 'fridge', 'plant', 'lamp', 'shelf'], cafe: ['stove', 'fridge', 'sink', 'shelf', 'plant', 'lamp', 'toilet', 'plant'], school: ['shelf', 'shelf', 'plant', 'lamp', 'shelf', 'toilet', 'sink', 'plant'] }[kind];
   slots.forEach((sl, i) => { if (i < WALL.length) put(WALL[i], sl.x, sl.z, sl.rot); });
   const set = (x, z) => { put('table', x, z, 0); put('chair', x - 1.3, z, PI / 2); put('chair', x + 1.3, z, -PI / 2); };
   const sit = (x, z, yaw) => { if (crowd.length >= 6) return; let c; try { c = mkCitizen('sitter', x, z, yaw, { home: new V3(x, 0, z), isStatic: true, sit: true }); } catch (e) { return; } if (b.purpose === 'school') c.g.scale.setScalar(0.65); crowd.push(c); };
@@ -111,13 +111,14 @@ function spawnInterior(b) {
     try { const tx = b.x - ox * (hf - CT - 1.7), tz = b.z - oz * (hf - CT - 1.7), tc = mkCitizen('teacher', tx, tz, b.ry + PI, { home: new V3(tx, 0, tz), isStatic: true, inst: b }); tc.teacher = true; crowd.push(tc); } catch (e) {}
   }
   if (kind === 'school') {} else if (Math.min(b.w, b.d) >= 9) {
-    if (kind === 'home') { put('rug', b.x, b.z, 0); set(b.x, b.z); } else if (kind === 'office') { set(b.x - 2.5, b.z); set(b.x + 2.5, b.z + 1.5); } else if (kind === 'cafe') { set(b.x - 2.2, b.z); set(b.x + 2.2, b.z); } else put('table', b.x, b.z, 0);
+    if (kind === 'home') { put('rug', b.x, b.z, 0); set(b.x, b.z); } else if (kind === 'office') { set(b.x - 2.5, b.z); set(b.x + 2.5, b.z + 1.5); } else if (kind === 'cafe') { set(b.x - 2.2, b.z); set(b.x + 2.2, b.z); } else if (kind !== 'prison') put('table', b.x, b.z, 0);
   }
   b.int = { groups, crowd, door: mkCityDoor(b), slots: slots.slice() };
+  if (kind === 'prison') b.int.pkeys = buildPrisonInterior(b, groups);
   if (b.floors >= 2 && b.shaft) b.int.elev = mkElevator(b, groups);
 }
 function despawnInterior(b) {
-  const it = b.int; if (!it) return; if (it.elev) elevDispose(it.elev); for (const c of it.crowd || []) removeCitizen(c);
+  const it = b.int; if (!it) return; if (it.pkeys) for (const k of it.pkeys) solids.delete(k); if (it.elev) elevDispose(it.elev); for (const c of it.crowd || []) removeCitizen(c);
   for (const g of it.groups) { scene.remove(g); g.traverse(m => { if (m.isMesh) m.geometry.dispose(); }); }
   unregOwner(b); const d = it.door; solids.delete('d' + d.k); const i = doors.indexOf(d); if (i >= 0) doors.splice(i, 1); scene.remove(d.grp); b.int = null;
 }

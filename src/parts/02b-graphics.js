@@ -1,6 +1,7 @@
 // ---------- graphics: quality levels (Low/Med/High), sky dome with clouds + stars, sun shadows ----------
 const GQ = { cur: isTouch ? 'low' : 'med', t: 0, flag: 0 };
 try { const q = localStorage.getItem('mw_q'); if (q === 'low' || q === 'med' || q === 'high') GQ.cur = q; } catch (e) {}
+const INT = { dim: 0, tgt: 0, it: 0 };
 const sunOff = new THREE.Vector3(60, 100, 30), _c1 = new THREE.Color(), _c2 = new THREE.Color();
 const SKYTOP = { n: new THREE.Color(0x02040c), d: new THREE.Color(0x2f6fc4), k: new THREE.Color(0x3a3f78) };
 const skyUni = { top: { value: new THREE.Color(0x2f6fc4) }, hor: { value: new THREE.Color(0x87ceeb) }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color(1, 0.9, 0.6) }, night: { value: 0 }, t: { value: 0 }, clouds: { value: 1 }, cover: { value: 0 }, flash: { value: 0 } };
@@ -66,6 +67,7 @@ function skyTick(dt, day, dusk, sy, a) {
   sun.color.setRGB(1, 0.97 - 0.3 * dusk, 0.9 - 0.5 * dusk);
   skyMesh.position.copy(cam.position);
   weatherTick(dt, day);
+  if (INT.dim > 0.001) { sun.intensity *= 1 - 0.88 * INT.dim; hemi.intensity *= 1 - 0.5 * INT.dim; }
   if (GQ.cur !== 'low') { GQ.t -= dt; if (GQ.t <= 0) { GQ.t = 1.2; flagShadows(); } }
 }
 function flagShadows() {
