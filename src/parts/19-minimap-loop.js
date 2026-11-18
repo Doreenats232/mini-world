@@ -38,7 +38,7 @@ logLine('Press T (or CHAT) to talk to Archie, Mason and Ranger. ⚙ = set your r
 if (!REL.key) setTimeout(() => logLine('Your NPCs are in scripted mode (no AI key). Tap ⚙, paste your RelayAPI key and press Test connection so they can really talk and think.', 'ev'), 4000);
 let last = performance.now(), spawnT = 0;
 ren.setAnimationLoop(now => {
-  const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
+  const _t0 = performance.now(); PERF.fr = now - last; const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
   cityT -= dt; if (cityT <= 0) { cityT = 0.3; updateCity(); }
   updateSky(dt); updateUse(dt); elevTick(dt); carFxTick(dt); fxTick(dt); gpsTick(dt); if (!PL.on) { updateCitizens(dt); instLife(dt); policeTick(dt); bankTick(dt); prisonTick(dt); updateResidents(dt); updateTraffic(dt); } updateViewmodel(dt); updateFx(dt); updateCarFx(dt); updateSoldiers(dt);
   { const pre = isTouch ? 'Tap DOOR: ' : 'Press E: '; let ht = ''; let carNear = null; if (!inCar) for (const c of cars) if (!c.dead && dist2(c.pos, P.pos) < 5) { carNear = c; break; } if (!inCar && !shopOpen) { if (shopNear()) ht = pre + 'open shop'; else { const u = nearestUse(); if (u) ht = pre + USEN[u.f]; else if (carNear) ht = pre + (carNear.bike ? 'get on bike' : 'open door'); else { const cz = nearestCitizen(); if (cz) ht = pre + 'talk to ' + cz.name + ' (' + (cz.label || cz.job) + ')'; } } } if (isTouch) { const cb = $('car'), want = !shopOpen && (inCar || !!ht); const lbl = inCar ? (inCar.bike ? 'OFF' : 'EXIT') : (carNear && !shopNear() && !nearestUse() ? 'DOOR' : 'USE'); if (cb._w !== want) { cb._w = want; cb.style.display = want ? 'flex' : 'none'; } if (cb._l !== lbl) { cb._l = lbl; cb.textContent = lbl; } } if (ht !== hintTxt) { hintTxt = ht; $('hint').textContent = ht; $('hint').style.display = ht ? 'block' : 'none'; } }
@@ -63,5 +63,5 @@ ren.setAnimationLoop(now => {
   for (let i = grow.length - 1; i >= 0; i--) { const g = grow[i]; g.t += dt * 4; const s = Math.min(1, 0.2 + g.t); g.m.scale.setScalar(s); if (s >= 1) grow.splice(i, 1); }
   for (const nd of nodes) { if (nd.left < nd.max) { nd.regen += dt; if (nd.regen > 6) { nd.regen = 0; nd.left++; nd.mesh.visible = true; nd.mesh.scale.setScalar(0.45 + 0.55 * nd.left / nd.max); } } }
   flashV = Math.max(0, flashV - dt * 1.5); $('flash').style.opacity = flashV;
-  ren.render(scene, cam);
+  PERF.js = performance.now() - _t0; ren.render(scene, cam);
 });

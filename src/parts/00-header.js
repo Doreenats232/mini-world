@@ -23,3 +23,4 @@ const WB = { lo: -625, hi: 575, lim0: -630, lim1: 580 };
 const inSlum = (x, z) => x < 0 && (x < -360 || z < -360 || z > 330), inRich = (x, z) => x > 0 && (x > 330 || z < -360 || z > 330);
 
 const PL = { on: 0, jv: 11, id: '', launch: null, ret: null, o2: 100 };
+const PERF = { fr: 16, js: 0, t: 0, n: 0, sj: 0, sf: 0, mx: 0 };

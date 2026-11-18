@@ -96,3 +96,13 @@ function plTick(dt) {
 
 // perf: Area 51 + fair decor does not cast shadows (hundreds of small meshes doubled the draw cost)
 [a51Grp, fairGrp].forEach(g => g.traverse(o => { if (o.isMesh) o.userData.noShadow = true; }));
+
+// ---------- stats line (top-left): FPS, frame ms, JS ms, draw calls, triangles, geometries, textures, scene meshes ----------
+const perfEl = document.createElement('div'); perfEl.style.cssText = 'position:fixed;top:4px;left:4px;padding:2px 6px;border-radius:6px;background:#000a;color:#9fe;font:11px monospace;z-index:70;pointer-events:none;white-space:pre'; document.body.appendChild(perfEl);
+function perfTick(dt) {
+  PERF.t += dt; PERF.n++; PERF.sj += PERF.js; PERF.sf += PERF.fr; PERF.mx = Math.max(PERF.mx, PERF.fr);
+  if (PERF.t < 1) return; const i = ren.info || { render: {}, memory: {} }, n = PERF.n;
+  if (!PERF.m || PERF.m-- <= 0) { PERF.m = 3; let c = 0; scene.traverse(o => { if (o.isMesh) c++; }); PERF.meshes = c; }
+  perfEl.textContent = 'FPS ' + Math.round(n / PERF.t) + '  frame ' + (PERF.sf / n).toFixed(0) + 'ms (worst ' + PERF.mx.toFixed(0) + ')  JS ' + (PERF.sj / n).toFixed(1) + 'ms\ncalls ' + i.render.calls + '  tris ' + Math.round(i.render.triangles / 1000) + 'k  geo ' + i.memory.geometries + '  tex ' + i.memory.textures + '  meshes ' + PERF.meshes + '\ncitizens ' + citizens.length + '  cars ' + cars.length + '  enemies ' + enemies.length + '  cops ' + cops.length;
+  PERF.t = 0; PERF.n = 0; PERF.sj = 0; PERF.sf = 0; PERF.mx = 0;
+}
