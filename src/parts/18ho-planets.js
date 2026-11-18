@@ -104,5 +104,9 @@ function perfTick(dt) {
   if (PERF.t < 1) return; const i = ren.info || { render: {}, memory: {} }, n = PERF.n;
   if (!PERF.m || PERF.m-- <= 0) { PERF.m = 3; let c = 0; scene.traverse(o => { if (o.isMesh) c++; }); PERF.meshes = c; }
   perfEl.textContent = 'FPS ' + Math.round(n / PERF.t) + '  frame ' + (PERF.sf / n).toFixed(0) + 'ms (worst ' + PERF.mx.toFixed(0) + ')  JS ' + (PERF.sj / n).toFixed(1) + 'ms\ncalls ' + i.render.calls + '  tris ' + Math.round(i.render.triangles / 1000) + 'k  geo ' + i.memory.geometries + '  tex ' + i.memory.textures + '  meshes ' + PERF.meshes + '\ncitizens ' + citizens.length + '  cars ' + cars.length + '  enemies ' + enemies.length + '  cops ' + cops.length;
+  const fps = n / PERF.t; PERF.slow = fps < 32 ? (PERF.slow || 0) + 1 : 0; PERF.cool = (PERF.cool || 0) - 1;
+  if (PERF.slow >= 3 && PERF.cool <= 0 && PERF.sj / n < 25) { PERF.cool = 8; PERF.slow = 0;
+    if (GQ.cur !== 'low') { GQ.cur = 'low'; applyQuality(false); msg('⚡ Slow GPU detected: graphics set to LOW', 3000); }
+    else if ((PERF.pr || Math.min(devicePixelRatio, 2)) > 0.6) { PERF.pr = Math.max(0.6, (PERF.pr || Math.min(devicePixelRatio, 2)) * 0.8); ren.setPixelRatio(PERF.pr); ren.setSize(innerWidth, innerHeight); msg('⚡ Slow GPU: render sharpness lowered', 2500); } }
   PERF.t = 0; PERF.n = 0; PERF.sj = 0; PERF.sf = 0; PERF.mx = 0;
 }

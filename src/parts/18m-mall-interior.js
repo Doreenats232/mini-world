@@ -47,7 +47,7 @@ function buildMallInterior(b, groups) {
 }
 function mallLife(b) {
   b.staffC = b.staffC || []; const G = mallGeom(b);
-  G.spots.forEach((s, i) => { const c0 = b.staffC[i]; if (c0 && !c0.dead && !c0.removed) return; if (citizens.length > (isTouch ? 34 : 70)) return;
+  G.spots.forEach((s, i) => { const c0 = b.staffC[i]; if (c0 && !c0.dead && !c0.removed) return; if (citizens.length > (isTouch ? 28 : 46)) return;
     try { const c = mkCitizen('suit', s.x, s.z, s.yaw, { role: 'worker', label: s.label, name: pick(NAMES), isStatic: true, home: new V3(s.x, 0, s.z), tgt: new V3(s.x, 0, s.z) }); c.stand = true; c.yaw = s.yaw; b.staffC[i] = c; } catch (e) {} });
 }
 function mallUse(o) {

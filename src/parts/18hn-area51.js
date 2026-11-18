@@ -92,7 +92,7 @@ function a51Tick(dt) {
 }
 function a51Life() {
   const spots = [[-44, 2, 0, 'Scientist'], [-38, 8, Math.PI, 'Scientist'], [10, -8, Math.PI, 'Scientist']];
-  spots.forEach(([x, z, yaw, label], i) => { const c0 = A51.staff[i]; if (c0 && !c0.dead && !c0.removed) return; if (citizens.length > (isTouch ? 34 : 70)) return;
+  spots.forEach(([x, z, yaw, label], i) => { const c0 = A51.staff[i]; if (c0 && !c0.dead && !c0.removed) return; if (citizens.length > (isTouch ? 28 : 46)) return;
     try { const c = mkCitizen('suit', AX + x, AZ + z, yaw, { role: 'worker', label, name: pick(NAMES), isStatic: true, home: new V3(AX + x, 0, AZ + z), tgt: new V3(AX + x, 0, AZ + z) }); c.stand = true; c.yaw = yaw; A51.staff[i] = c; } catch (e) {} });
 }
 EXTRA_PLACES.push({ x: AX, z: AZ + 44, type: 'area51', name: 'AREA 51', b: null });

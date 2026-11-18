@@ -39,7 +39,7 @@ function instLife(dt) {
   for (const b of institutions) {
     if (Math.hypot(b.x - P.pos.x, b.z - P.pos.z) > 90) continue;
     b.crowd = (b.crowd || []).filter(c => !c.dead);
-    if (citizens.length > (isTouch ? 34 : 70)) continue;
+    if (citizens.length > (isTouch ? 28 : 46)) continue;
     if (b.purpose === 'school') {
       if (!b.guard || b.guard.dead) { const g = mkCitizen('guard', b.post.x, b.post.z, b.ry, { home: new V3(b.post.x, 0, b.post.z), isStatic: true, inst: b }); g.aR.add(prop([cbox(0.06, 0.5, 0.06, 0.05, -0.75, 0.3, 0x111111)])); b.guard = g; }
       if (ph === 'class' || ph === 'closed') continue;
