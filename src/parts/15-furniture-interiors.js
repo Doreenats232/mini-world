@@ -70,6 +70,7 @@ function useIt(u) {
   else if (f === 'nasadesk') nasaDesk();
   else if (f === 'mallbuy') mallUse(u.owner);
   else if (f.startsWith('fair')) fairUse(f, u.owner);
+  else if (f.startsWith('a51')) a51Use(f, u.owner);
   else if (f === 'bed') { dayT = 0.27; msg('You slept. Good morning!', 2200); sfx('click'); }
 }
 function tryUse() { const u = nearestUse(); if (!u) return false; useIt(u); return true; }
