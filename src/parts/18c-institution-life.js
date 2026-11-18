@@ -45,6 +45,7 @@ function instLife(dt) {
       if (ph === 'class' || ph === 'closed') continue;
     }
     if (b.purpose === 'prison') { prisonLife(b); continue; }
+    if (b.purpose === 'nasa') { nasaLife(b); continue; }
     const [job, n] = INST_JOBS[b.purpose]; if (b.crowd.length >= n) continue;
     const half = (b.ry === 0 || b.ry === Math.PI) ? b.d / 2 : b.w / 2, hx = b.x + Math.sin(b.ry) * (half + 2.5), hz = b.z + Math.cos(b.ry) * (half + 2.5);
     const c = mkCitizen(job, hx, hz, b.ry, { home: new V3(hx, 0, hz), tgt: new V3(hx, 0, hz), isStatic: true, inst: b }); b.crowd.push(c);

@@ -55,7 +55,7 @@ function updateDoors(dt) {
 
 // ---------- interactive fixtures (E to use) ----------
 const useables = [], USEF = new Set(['lamp', 'sink', 'toilet', 'fridge', 'stove', 'bed']);
-const USEN = { lamp: 'switch lamp', sink: 'turn tap', toilet: 'flush', fridge: 'open fridge', stove: 'use stove', bed: 'sleep' };
+const USEN = { nasadesk: 'ask reception', lamp: 'switch lamp', sink: 'turn tap', toilet: 'flush', fridge: 'open fridge', stove: 'use stove', bed: 'sleep' };
 function regUse(grp, f, owner) { const u = { grp, f, owner, st: 0, t: 0, snd: 0 }; useables.push(u); return u; }
 function unregOwner(o) { for (let i = useables.length - 1; i >= 0; i--) if (useables[i].owner === o) useables.splice(i, 1); }
 function nearestUse() { let b = null, bd = 2.8; for (const u of useables) { const d = Math.hypot(u.grp.position.x - P.pos.x, u.grp.position.z - P.pos.z); if (d < bd && Math.abs(u.grp.position.y - P.pos.y) < 2.5) { bd = d; b = u; } } return b; }
@@ -67,6 +67,7 @@ function useIt(u) {
   else if (f === 'fridge') { u.st = u.st ? 0 : 1; sfx('click'); }
   else if (f === 'stove') { u.st = u.st ? 0 : 1; ud.burn.forEach(m => m.color.setHex(u.st ? 0xff4422 : 0x222222)); sfx('click'); if (u.st) sfx('sizzle'); }
   else if (f === 'elevcall') elevCall(u.owner, u.k);
+  else if (f === 'nasadesk') nasaDesk();
   else if (f === 'bed') { dayT = 0.27; msg('You slept. Good morning!', 2200); sfx('click'); }
 }
 function tryUse() { const u = nearestUse(); if (!u) return false; useIt(u); return true; }
@@ -92,7 +93,7 @@ function mkCityDoor(b) {
 }
 function spawnInterior(b) {
   let sd = (b.id * 7919 + 13) % 2147483647 || 1; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
-  const kind = b.purpose ? ({ school: 'school', university: 'school', company: 'office', nasa: 'office', police: 'office', bank: 'office', prison: 'prison' })[b.purpose] : ['home', 'office', 'store', 'cafe'][Math.floor(r() * 4)], groups = [], PI = Math.PI, crowd = [];
+  const kind = b.purpose ? ({ school: 'school', university: 'school', company: 'office', nasa: 'prison', police: 'office', bank: 'office', prison: 'prison' })[b.purpose] : ['home', 'office', 'store', 'cafe'][Math.floor(r() * 4)], groups = [], PI = Math.PI, crowd = [];
   const put = (type, x, z, rot) => { if (b.shaft && x > b.shaft.x0 - 1 && x < b.shaft.x1 + 1 && z > b.shaft.z0 - 1 && z < b.shaft.z1 + 1) return; const g = new THREE.Group(); mkFurn(type, g); g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g); groups.push(g); if (USEF.has(type)) regUse(g, type, b); };
   const slots = [];
   for (const sr of [0, PI / 2, PI, -PI / 2]) {
@@ -114,7 +115,7 @@ function spawnInterior(b) {
     if (kind === 'home') { put('rug', b.x, b.z, 0); set(b.x, b.z); } else if (kind === 'office') { set(b.x - 2.5, b.z); set(b.x + 2.5, b.z + 1.5); } else if (kind === 'cafe') { set(b.x - 2.2, b.z); set(b.x + 2.2, b.z); } else if (kind !== 'prison') put('table', b.x, b.z, 0);
   }
   b.int = { groups, crowd, door: mkCityDoor(b), slots: slots.slice() };
-  if (kind === 'prison') b.int.pkeys = buildPrisonInterior(b, groups);
+  if (kind === 'prison') { if (b.purpose === 'nasa') { const r = buildNasaInterior(b, groups); b.int.pkeys = r.keys; b.int.ndoors = r.doors; } else b.int.pkeys = buildPrisonInterior(b, groups); }
   if (b.floors >= 2 && b.shaft) b.int.elev = mkElevator(b, groups);
 }
 function despawnInterior(b) {

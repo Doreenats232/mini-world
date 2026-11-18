@@ -77,9 +77,9 @@ function buildPrisonInterior(b, groups) {
   return keys;
 }
 // moody dim lighting while the player is inside a prison (any institution listed here gets the dim treatment)
-const MOODY = { prison: 1 };
+const MOODY = { prison: 1, nasa: 0.5 };
 function moodTick(dt) {
-  INT.it -= dt; if (INT.it <= 0) { INT.it = 0.25; INT.tgt = 0; for (const b of institutions) if (MOODY[b.purpose] && b.on && Math.abs(cam.position.x - b.x) < b.w / 2 && Math.abs(cam.position.z - b.z) < b.d / 2 && cam.position.y < 4.5) { INT.tgt = 1; break; } }
+  INT.it -= dt; if (INT.it <= 0) { INT.it = 0.25; INT.tgt = 0; for (const b of institutions) if (MOODY[b.purpose] && b.on && Math.abs(cam.position.x - b.x) < b.w / 2 && Math.abs(cam.position.z - b.z) < b.d / 2 && cam.position.y < (b.purpose === 'nasa' ? 9 : 4.5)) { INT.tgt = Math.max(INT.tgt, MOODY[b.purpose]); } }
   INT.dim += (INT.tgt - INT.dim) * Math.min(1, dt * 3);
   if (INT.dim < 0.01) { INT.dim = 0; intLight.intensity = 0; return; }
   intLight.position.set(P.pos.x, 3.2, P.pos.z); intLight.intensity = 1.5 * INT.dim;
