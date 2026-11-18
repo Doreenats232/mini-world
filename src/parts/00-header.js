@@ -21,3 +21,5 @@ try { const n = localStorage.getItem('mw_name'); if (n) net.name = n; } catch (e
 // city bounds (roads lines 50k+25). Old downtown = blocks -7..6; new ring out to blocks -12..11
 const WB = { lo: -625, hi: 575, lim0: -630, lim1: 580 };
 const inSlum = (x, z) => x < 0 && (x < -360 || z < -360 || z > 330), inRich = (x, z) => x > 0 && (x > 330 || z < -360 || z > 330);
+
+const PL = { on: 0, jv: 11, id: '', launch: null, ret: null, o2: 100 };

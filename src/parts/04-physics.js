@@ -9,6 +9,7 @@ function move(e, axis, d) {
     else e.pos[axis] = d > 0 ? b.min[axis] - e.R : b.max[axis] + e.R;
   }
 }
-function phys(e, mx, mz, dt) { e.vel.y -= 28 * dt; move(e, 'x', mx * dt); move(e, 'z', mz * dt); e.ground = false; move(e, 'y', e.vel.y * dt); if (e.pos.y <= 0) { e.pos.y = 0; e.vel.y = 0; e.ground = true; } }
+let GRAV = 28;
+function phys(e, mx, mz, dt) { e.vel.y -= GRAV * dt; move(e, 'x', mx * dt); move(e, 'z', mz * dt); e.ground = false; move(e, 'y', e.vel.y * dt); if (e.pos.y <= 0) { e.pos.y = 0; e.vel.y = 0; e.ground = true; } }
 const dist2 = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 

@@ -20,7 +20,7 @@ function addBlock(cx, cy, cz, t, doSave = true, anim = false) {
 }
 function delBlock(k) { const m = blockMeshes.get(k); if (!m) return; scene.remove(m); targets.splice(targets.indexOf(m), 1); blockMeshes.delete(k); solids.delete(k); if (net.on && !net.applying) netSend({ t: 'b-', k }); queueSave(); }
 function queueSave() { clearTimeout(saveT); saveT = setTimeout(save, 400); }
-function save() { if (net.noSave) return; try { localStorage.setItem('mw_save', JSON.stringify({ b: [...blockMeshes.values()].map(m => [m.userData.cx, m.userData.cy, m.userData.cz, m.userData.c]), p: [P.pos.x, P.pos.y, P.pos.z, P.yaw], k: kills, m: money, u: up, sg: hasShotgun, f: [...furn.values()].map(o => [o.cx, o.cy, o.cz, o.f, o.rot]) })); } catch (e) {} }
+function save() { if (net.noSave || PL.on) return; try { localStorage.setItem('mw_save', JSON.stringify({ b: [...blockMeshes.values()].map(m => [m.userData.cx, m.userData.cy, m.userData.cz, m.userData.c]), p: [P.pos.x, P.pos.y, P.pos.z, P.yaw], k: kills, m: money, u: up, sg: hasShotgun, f: [...furn.values()].map(o => [o.cx, o.cy, o.cz, o.f, o.rot]) })); } catch (e) {} }
 setInterval(() => save(), 10000); addEventListener('beforeunload', save);
 
 // ---------- player ----------
@@ -51,7 +51,7 @@ function hurt(n, force) {
   if (P.hp <= 0) { wanted = 0; clearCops(); hudStars(); P.hp = maxHp(); P.pos.set(25, 1, 25); P.vel.set(0, 0, 0); msg('YOU DIED'); sfx('die'); flashV = 0.8; }
   hud();
 }
-function jump() { if (P.ground) { P.vel.y = 11; P.ground = false; } }
+function jump() { if (P.ground) { P.vel.y = PL.jv; P.ground = false; } }
 function playerStep(dt) {
   if (typeof RIDE !== 'undefined' && RIDE.on) { rideStep(dt); return; }
   if (A51.fly) { ufoStep(dt); return; }

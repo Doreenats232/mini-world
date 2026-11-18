@@ -114,6 +114,7 @@ function buildNasaInterior(b, groups) {
   B(0.2, 0.2, 0.2, Wh - 0.2, IC - 0.4, zg + 0.3, M.amber); B(0.2, 0.2, 0.2, -Wh + 0.2, IC - 0.4, Hh - 0.3, M.red);
   // reception use + door visuals state
   const gdesk = new THREE.Group(); gdesk.position.set(G.desk.x, 0, G.desk.z); scene.add(gdesk); groups.push(gdesk); const dm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), M.amber); dm.position.y = 1.4; dm.visible = false; gdesk.add(dm); regUse(gdesk, 'nasadesk', b);
+  for (const [ox, dest] of [[-1.2, 'moon'], [1.2, 'mars']]) { const w = G.toW(rx + ox, rz + 1.9), gr = new THREE.Group(); gr.position.set(w.x, 0, w.z); scene.add(gr); groups.push(gr); regUse(gr, 'nasarocket', { dest }); }
   return { keys, doors };
 }
 function nasaDoorPose(d) {

@@ -18,6 +18,7 @@ if (native) {
 let dayT = 0.3, dayLight = 1;
 const cNight = new THREE.Color(0x070b1f), cDay = new THREE.Color(0x87ceeb), cDusk = new THREE.Color(0xff8a50), cTmp = new THREE.Color();
 function updateSky(dt) {
+  if (PL.on) { planetSky(dt); return; }
   dayT = (dayT + dt / 300) % 1;
   const a = dayT * Math.PI * 2, sy = -Math.cos(a);
   const day = Math.min(1, Math.max(0, (sy + 0.15) / 0.4)), dusk = Math.max(0, 1 - Math.abs(sy) / 0.3) * 0.6;

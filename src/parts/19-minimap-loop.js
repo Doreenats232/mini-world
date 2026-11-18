@@ -40,14 +40,14 @@ let last = performance.now(), spawnT = 0;
 ren.setAnimationLoop(now => {
   const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt; cool -= dt;
   cityT -= dt; if (cityT <= 0) { cityT = 0.3; updateCity(); }
-  updateSky(dt); updateUse(dt); elevTick(dt); carFxTick(dt); fxTick(dt); updateCitizens(dt); instLife(dt); policeTick(dt); bankTick(dt); prisonTick(dt); gpsTick(dt); updateResidents(dt); updateTraffic(dt); updateViewmodel(dt); updateFx(dt); updateCarFx(dt); updateSoldiers(dt);
+  updateSky(dt); updateUse(dt); elevTick(dt); carFxTick(dt); fxTick(dt); gpsTick(dt); if (!PL.on) { updateCitizens(dt); instLife(dt); policeTick(dt); bankTick(dt); prisonTick(dt); updateResidents(dt); updateTraffic(dt); } updateViewmodel(dt); updateFx(dt); updateCarFx(dt); updateSoldiers(dt);
   { const pre = isTouch ? 'Tap DOOR: ' : 'Press E: '; let ht = ''; let carNear = null; if (!inCar) for (const c of cars) if (!c.dead && dist2(c.pos, P.pos) < 5) { carNear = c; break; } if (!inCar && !shopOpen) { if (shopNear()) ht = pre + 'open shop'; else { const u = nearestUse(); if (u) ht = pre + USEN[u.f]; else if (carNear) ht = pre + (carNear.bike ? 'get on bike' : 'open door'); else { const cz = nearestCitizen(); if (cz) ht = pre + 'talk to ' + cz.name + ' (' + (cz.label || cz.job) + ')'; } } } if (isTouch) { const cb = $('car'), want = !shopOpen && (inCar || !!ht); const lbl = inCar ? (inCar.bike ? 'OFF' : 'EXIT') : (carNear && !shopNear() && !nearestUse() ? 'DOOR' : 'USE'); if (cb._w !== want) { cb._w = want; cb.style.display = want ? 'flex' : 'none'; } if (cb._l !== lbl) { cb._l = lbl; cb.textContent = lbl; } } if (ht !== hintTxt) { hintTxt = ht; $('hint').textContent = ht; $('hint').style.display = ht ? 'block' : 'none'; } }
-  miniT -= dt; if (miniT <= 0) { miniT = 0.066; drawMini(); }
+  miniT -= dt; if (miniT <= 0) { miniT = 0.066; if (!PL.on) drawMini(); }
   if (inCar) driveCar(dt); else if (enter) updateEnter(dt); else playerStep(dt);
   updatePlayerModel(dt);
   if (held && mode === 'fight' && !inCar && !A51.fly) shoot();
   for (let i = enemies.length - 1; i >= 0; i--) { if (!enemies[i]) continue; if (enemies[i].dead) enemies.splice(i, 1); else enemyStep(enemies[i], dt); }
-  spawnT -= dt; if (spawnT <= 0 && enemies.length < (inSlum(P.pos.x, P.pos.z) ? 18 : 10)) { spawnEnemy(); spawnT = 3; }
+  spawnT -= dt; if (!PL.on && spawnT <= 0 && enemies.length < (inSlum(P.pos.x, P.pos.z) ? 18 : 10)) { spawnEnemy(); spawnT = 3; }
   for (let i = cops.length - 1; i >= 0; i--) { if (!cops[i]) continue; if (cops[i].dead) cops.splice(i, 1); else copStep(cops[i], dt); }
   if (wanted > 0) {
     copLeaveT = 5; copT -= dt; if (copT <= 0 && cops.length < wanted * 2) { spawnCop(); copT = 1.5; }
