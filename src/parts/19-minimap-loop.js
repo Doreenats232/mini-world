@@ -45,7 +45,7 @@ ren.setAnimationLoop(now => {
   miniT -= dt; if (miniT <= 0) { miniT = 0.066; drawMini(); }
   if (inCar) driveCar(dt); else if (enter) updateEnter(dt); else playerStep(dt);
   updatePlayerModel(dt);
-  if (held && mode === 'fight' && !inCar) shoot();
+  if (held && mode === 'fight' && !inCar && !A51.fly) shoot();
   for (let i = enemies.length - 1; i >= 0; i--) { if (!enemies[i]) continue; if (enemies[i].dead) enemies.splice(i, 1); else enemyStep(enemies[i], dt); }
   spawnT -= dt; if (spawnT <= 0 && enemies.length < (inSlum(P.pos.x, P.pos.z) ? 18 : 10)) { spawnEnemy(); spawnT = 3; }
   for (let i = cops.length - 1; i >= 0; i--) { if (!cops[i]) continue; if (cops[i].dead) cops.splice(i, 1); else copStep(cops[i], dt); }

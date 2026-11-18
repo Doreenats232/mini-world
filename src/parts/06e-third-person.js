@@ -27,7 +27,7 @@ function updateEnter(dt) {
 function updatePlayerModel(dt) {
   if (!SOLDIER) return;
   if (!pmod) { pmod = makeSoldier(null, 1.0); pmod.last = P.pos.clone(); pmod.face = 0; scene.add(pmod.root); }
-  const show = tpv && !inCar && !shopOpen; pmod.root.visible = show;
+  const show = tpv && !inCar && !shopOpen && !A51.fly; pmod.root.visible = show;
   if (!show) { pmod.last.copy(P.pos); return; }
   const dx = P.pos.x - pmod.last.x, dz = P.pos.z - pmod.last.z, sp = Math.hypot(dx, dz) / Math.max(dt, 0.001); pmod.last.copy(P.pos);
   const armed = mode === 'fight' && !enter; if (armed && (cool > 0 || held)) pmod.aimT = 2.2; else pmod.aimT = Math.max(0, (pmod.aimT || 0) - dt);
