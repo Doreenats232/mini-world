@@ -68,20 +68,28 @@ bmc.addEventListener('pointerup', mapUp); bmc.addEventListener('pointercancel', 
 bmc.addEventListener('wheel', e => { e.preventDefault(); const w = bmW(e.clientX, e.clientY), f = e.deltaY < 0 ? 1.15 : 1 / 1.15; bmv.s = Math.max(0.25, Math.min(6, bmv.s * f)); const w2 = bmW(e.clientX, e.clientY); bmv.cx += w.x - w2.x; bmv.cz += w.z - w2.z; }, { passive: false });
 function drawBig() {
   const g = bmc.getContext('2d'), W = bmc.width, H = bmc.height, s = bmv.s, X = x => W / 2 + (x - bmv.cx) * s, Z = z => H / 2 + (z - bmv.cz) * s;
-  g.fillStyle = '#2f5a2a'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#141c2e'; g.fillRect(0, 0, W, H);
   const zone = (x0, x1, z0, z1, col) => { g.fillStyle = col; g.fillRect(X(x0), Z(z0), (x1 - x0) * s, (z1 - z0) * s); };
-  for (const [a, b, c, d] of [[330, 650, -650, 650], [0, 330, -650, -360], [0, 330, 330, 650]]) zone(a, b, c, d, '#3f6e31');
-  for (const [a, b, c, d] of [[-650, -360, -650, 650], [-360, 0, -650, -360], [-360, 0, 330, 650]]) zone(a, b, c, d, '#6b5a3e');
-  g.fillStyle = '#3a3d44'; for (let k = -13; k <= 11; k++) { g.fillRect(X(k * 50 + 18), Z(-650), 14 * s, 1300 * s); g.fillRect(X(-650), Z(k * 50 + 18), 1300 * s, 14 * s); }
-  g.fillStyle = '#8a8f98'; for (const b of cityFoot) { const x0 = X(b.min.x), z0 = Z(b.min.z), w = (b.max.x - b.min.x) * s, h = (b.max.z - b.min.z) * s; if (x0 > W || z0 > H || x0 + w < 0 || z0 + h < 0) continue; g.fillRect(x0, z0, w, h); }
-  for (const p of places()) if (p.b && !bmv.hidden.has(p.type)) { g.fillStyle = PLACE_TYPES[p.type][1]; g.fillRect(X(p.b.x - p.b.w / 2), Z(p.b.z - p.b.d / 2), p.b.w * s, p.b.d * s); }
-  g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.5)'; g.font = 'bold ' + Math.max(12, 22 * s) + 'px sans-serif'; g.fillText('RICH SIDE', X(500), Z(0)); g.fillText('SLUMS', X(-500), Z(0)); g.fillText('DOWNTOWN', X(-25), Z(-30));
+  for (const [a, b, c, d] of [[330, 650, -650, 650], [0, 330, -650, -360], [0, 330, 330, 650]]) zone(a, b, c, d, '#16322f');
+  for (const [a, b, c, d] of [[-650, -360, -650, 650], [-360, 0, -650, -360], [-360, 0, 330, 650]]) zone(a, b, c, d, '#1d2233');
+  zone(-360, 330, -360, 330, '#192339');
+  const RN = ['Kampala Rd', 'Sir Apollo Kaggwa Rd', 'Hoima Rd', 'Jinja Rd', 'Entebbe Rd', 'Bombo Rd', 'Gayaza Rd', 'Masaka Rd', 'Mityana Rd', 'Ntinda Rd', 'Kira Rd', 'Kyambogo Rd', 'Lugogo Bypass', 'Nile Ave', 'Victoria Ave', 'Pioneer Rd', 'Station Rd', 'Market St', 'Church Rd', 'Mbogo Rd', 'Albert Cook Rd', 'Wakaliga Rd', 'Sixth St', 'Spring Rd', 'Kitgum Rd'];
+  g.lineCap = 'butt'; for (const [col, wd] of [['#2b3a5a', 14 * s + 2], ['#3b5180', 14 * s - 2]]) { g.strokeStyle = col; g.lineWidth = Math.max(2, wd); for (let k = -13; k <= 11; k++) { const c = k * 50 + 25; g.beginPath(); g.moveTo(X(c), Z(-650)); g.lineTo(X(c), Z(650)); g.stroke(); g.beginPath(); g.moveTo(X(-650), Z(c)); g.lineTo(X(650), Z(c)); g.stroke(); } }
+  g.strokeStyle = 'rgba(210,225,255,.22)'; g.lineWidth = 1; g.setLineDash([6, 8]); for (let k = -13; k <= 11; k++) { const c = k * 50 + 25; g.beginPath(); g.moveTo(X(c), Z(-650)); g.lineTo(X(c), Z(650)); g.stroke(); g.beginPath(); g.moveTo(X(-650), Z(c)); g.lineTo(X(650), Z(c)); g.stroke(); } g.setLineDash([]);
+  g.fillStyle = '#26324d'; g.strokeStyle = '#33426a'; g.lineWidth = 1; for (const b of cityFoot) { const x0 = X(b.min.x), z0 = Z(b.min.z), w = (b.max.x - b.min.x) * s, h = (b.max.z - b.min.z) * s; if (x0 > W || z0 > H || x0 + w < 0 || z0 + h < 0) continue; g.fillRect(x0, z0, w, h); if (s > 0.8) g.strokeRect(x0 + 0.5, z0 + 0.5, w, h); }
+  for (const p of places()) if (p.b && !bmv.hidden.has(p.type)) { g.fillStyle = PLACE_TYPES[p.type][1]; g.globalAlpha = 0.85; g.fillRect(X(p.b.x - p.b.w / 2), Z(p.b.z - p.b.d / 2), p.b.w * s, p.b.d * s); g.globalAlpha = 1; }
+  if (s >= 0.8) { g.fillStyle = '#8ea4cf'; g.font = 'bold ' + Math.round(Math.min(13, 9 + s * 3)) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let k = -13; k <= 11; k++) { const c = k * 50 + 25, xs = X(c), zs = Z(c), nm = RN[(k + 13) % RN.length], nm2 = RN[(k * 7 + 40) % RN.length];
+      if (xs > 20 && xs < W - 20) for (let t = 0; t < 4; t++) { const ty = H * (0.15 + 0.25 * t) + (k * 37 % 80); g.save(); g.translate(xs, ty); g.rotate(-Math.PI / 2); g.fillText(nm, 0, 0); g.restore(); }
+      if (zs > 20 && zs < H - 20) for (let t = 0; t < 3; t++) g.fillText(nm2, W * (0.18 + 0.3 * t) + (k * 53 % 90), zs); } }
+  g.textAlign = 'center'; g.fillStyle = 'rgba(180,200,240,.55)'; g.font = 'bold ' + Math.max(12, 22 * s) + 'px sans-serif'; g.fillText('RICH SIDE', X(500), Z(0)); g.fillText('SLUMS', X(-500), Z(0)); g.fillText('DOWNTOWN', X(-25), Z(-30));
   if (route) { g.strokeStyle = '#ff2d95'; g.lineWidth = Math.max(4, 4 * s); g.lineJoin = 'round'; g.beginPath(); route.pts.forEach((p, i) => i ? g.lineTo(X(p.x), Z(p.z)) : g.moveTo(X(p.x), Z(p.z))); g.stroke(); }
-  const r = Math.max(10, Math.min(17, 10 * s * 1.6)); g.font = Math.round(r + 2) + 'px sans-serif'; g.textBaseline = 'middle';
+  const r = Math.max(9, Math.min(14, 10 * s * 1.4)); g.textBaseline = 'middle';
   for (const p of places()) {
-    if (bmv.hidden.has(p.type)) continue; const x = X(p.x), y = Z(p.z); if (x < -30 || y < -30 || x > W + 30 || y > H + 30) continue;
-    g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fill(); g.strokeStyle = PLACE_TYPES[p.type][1]; g.lineWidth = 3; g.stroke(); g.fillStyle = '#000'; g.fillText(PLACE_TYPES[p.type][0], x, y + 1);
-    if (s >= 0.9) { g.font = 'bold 11px sans-serif'; g.lineWidth = 3; g.strokeStyle = '#000'; g.strokeText(p.name, x, y + r + 9); g.fillStyle = '#fff'; g.fillText(p.name, x, y + r + 9); g.font = Math.round(r + 2) + 'px sans-serif'; }
+    if (bmv.hidden.has(p.type)) continue; const x = X(p.x), y = Z(p.z); if (x < -30 || y < -30 || x > W + 30 || y > H + 30) continue; const col = PLACE_TYPES[p.type][1];
+    g.fillStyle = col; g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 2; g.beginPath(); g.arc(x, y - r - 3, r, Math.PI * 0.8, Math.PI * 0.2, false); g.lineTo(x, y); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y - r - 3, r * 0.72, 0, 6.2832); g.fill(); g.font = Math.round(r) + 'px sans-serif'; g.fillStyle = '#000'; g.textAlign = 'center'; g.fillText(PLACE_TYPES[p.type][0], x, y - r - 2);
+    if (s >= 0.7) { g.font = 'bold 11px sans-serif'; g.lineWidth = 3; g.strokeStyle = '#0b1220'; g.strokeText(p.name, x, y + 9); g.fillStyle = '#e8eefc'; g.fillText(p.name, x, y + 9); }
   }
   if (gwp) { const x = X(gwp.x), y = Z(gwp.z); g.fillStyle = '#ff2d95'; g.beginPath(); g.arc(x, y - 14, 10, 0, 6.2832); g.fill(); g.beginPath(); g.moveTo(x - 7, y - 8); g.lineTo(x + 7, y - 8); g.lineTo(x, y); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y - 14, 4, 0, 6.2832); g.fill(); }
   const me = inCar ? inCar.pos : P.pos, fx = inCar ? Math.sin(inCar.h) : -Math.sin(P.yaw), fz = inCar ? Math.cos(inCar.h) : -Math.cos(P.yaw);
