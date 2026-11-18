@@ -8,6 +8,7 @@ function mkCar(x, z, h, col, owned = false, type, ai = false) {
 mkCar(25, 45, 0, 0xd62828); mkCar(45, 25, Math.PI / 2, 0x2a9d8f); mkCar(-25, -5, 0, 0xf4a261); mkCar(75, -25, Math.PI / 2, 0x6a4c93);
 mkBike(30, 33, 0.6); mkBike(18, 12, -0.8); mkBike(-20, 8, 2.2);
 function toggleCar() {
+  if (RIDE.on) { rideOff(); return; }
   if (enter) return;
   if (!inCar && shopNear()) { openShop(); return; }
   if (!inCar && tryUse()) return;

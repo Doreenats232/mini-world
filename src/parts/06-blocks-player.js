@@ -53,6 +53,7 @@ function hurt(n, force) {
 }
 function jump() { if (P.ground) { P.vel.y = 11; P.ground = false; } }
 function playerStep(dt) {
+  if (typeof RIDE !== 'undefined' && RIDE.on) { rideStep(dt); return; }
   const f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - joy.y, s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + joy.x;
   const sin = Math.sin(P.yaw), cos = Math.cos(P.yaw);
   let mx = -sin * f + cos * s, mz = -cos * f - sin * s;

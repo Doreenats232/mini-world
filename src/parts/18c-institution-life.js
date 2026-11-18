@@ -1,5 +1,5 @@
 // ---- life at the institutions: school day (class / break / home time), gates, guards, students, staff ----
-const INST_JOBS = { school: ['kid', 6], university: ['student', 6], company: ['suit', 3], nasa: ['suit', 4], police: ['suit', 0], bank: ['suit', 0], prison: ['suit', 0] };
+const INST_JOBS = { school: ['kid', 6], university: ['student', 6], company: ['suit', 3], nasa: ['suit', 4], mall: ['suit', 0], police: ['suit', 0], bank: ['suit', 0], prison: ['suit', 0] };
 let instT = 0;
 function instTgt(c) {
   const b = c.inst, ox = Math.sin(b.ry), oz = Math.cos(b.ry), tx = Math.cos(b.ry), tz = -Math.sin(b.ry), u = (Math.random() - 0.5) * 12, o = Math.random() * 2;
@@ -46,6 +46,7 @@ function instLife(dt) {
     }
     if (b.purpose === 'prison') { prisonLife(b); continue; }
     if (b.purpose === 'nasa') { nasaLife(b); continue; }
+    if (b.purpose === 'mall') { mallLife(b); continue; }
     if (b.purpose === 'university') uniLife(b);
     const [job, n] = INST_JOBS[b.purpose]; if (b.crowd.length >= n) continue;
     const half = (b.ry === 0 || b.ry === Math.PI) ? b.d / 2 : b.w / 2, hx = b.x + Math.sin(b.ry) * (half + 2.5), hz = b.z + Math.cos(b.ry) * (half + 2.5);

@@ -19,7 +19,7 @@ function buildShell(b) {
   const L = { fac: [], roof: [], wall: [], floor: [], ceil: [], frame: [] }, boxes = [];
   // tall generic buildings get real upper floors (slabs) with an elevator shaft in the back corner
   const nF = (!b.purpose && h >= 8) ? Math.floor(h / CG) : 1; b.floors = nF; b.shaft = null;
-  const IC = b.purpose === 'nasa' ? Math.min(8, h - 1.5) : CG;
+  const IC = b.purpose === 'nasa' ? Math.min(8, h - 1.5) : b.purpose === 'mall' ? 7 : CG;
   if (nF >= 2) {
     const ewD = b.ry === 0 || b.ry === PI, n0x = Math.round(Math.sin(b.ry)), n0z = Math.round(Math.cos(b.ry)), t0x = Math.round(Math.cos(b.ry)), t0z = -Math.round(Math.sin(b.ry)), Lw0 = ewD ? w : d, hf0 = ewD ? d / 2 : w / 2;
     const hx = cx - n0x * (hf0 - CT - 1.75) + t0x * (Lw0 / 2 - CT - 1.75), hz = cz - n0z * (hf0 - CT - 1.75) + t0z * (Lw0 / 2 - CT - 1.75);

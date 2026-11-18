@@ -1,7 +1,7 @@
 // ---- GPS map: every place on a full-screen map, tap to set a waypoint, route follows you like GTA ----
 const gSnap = v => Math.round((v - 25) / 50) * 50 + 25;
-const PLACE_TYPES = { school: ['🏫', '#e67e22', 'Schools'], university: ['🎓', '#8e44ad', 'Universities'], company: ['🏢', '#2e86de', 'Companies'], nasa: ['🚀', '#e0301e', 'NASA'], police: ['🚔', '#1e3a8a', 'Police'], bank: ['🏦', '#16a085', 'Banks'], prison: ['🔒', '#7f8c8d', 'Prison'], shop: ['🛒', '#f1c40f', 'Shop'] };
-let placeList = null; const places = () => placeList || (placeList = institutions.map(b => ({ x: b.x, z: b.z, type: b.purpose, name: b.pname, b })).concat([{ x: SHOP.x, z: SHOP.z, type: 'shop', name: 'General Shop', b: null }]));
+const PLACE_TYPES = { school: ['🏫', '#e67e22', 'Schools'], university: ['🎓', '#8e44ad', 'Universities'], company: ['🏢', '#2e86de', 'Companies'], nasa: ['🚀', '#e0301e', 'NASA'], police: ['🚔', '#1e3a8a', 'Police'], bank: ['🏦', '#16a085', 'Banks'], prison: ['🔒', '#7f8c8d', 'Prison'], shop: ['🛒', '#f1c40f', 'Shop'], mall: ['🛍', '#e84393', 'Mall'], fair: ['🎡', '#f39c12', 'Fun Fair'] };
+let placeList = null; const places = () => placeList || (placeList = institutions.map(b => ({ x: b.x, z: b.z, type: b.purpose, name: b.pname, b })).concat([{ x: SHOP.x, z: SHOP.z, type: 'shop', name: 'General Shop', b: null }].concat(EXTRA_PLACES)));
 let gwp = null, route = null, gpsT = 0, gbeam = null, mapOpen = false, bmRaf = 0;
 const gpsEl = document.createElement('div'); gpsEl.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);background:#000b;color:#fff;padding:6px 14px;border-radius:14px;z-index:20;font:13px sans-serif;display:none;cursor:pointer'; document.body.appendChild(gpsEl);
 gpsEl.onclick = () => clearWaypoint(); gpsEl.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); clearWaypoint(); }, { passive: false });
