@@ -93,3 +93,6 @@ function plTick(dt) {
   for (let i = PL.mobs.length - 1; i >= 0; i--) { const e = PL.mobs[i]; if (e.dead) { e.mesh.traverse(m => { const k = enemyMeshes.indexOf(m); if (k >= 0) enemyMeshes.splice(k, 1); }); if (Math.random() < 0.3) { A51.samples++; a51Save(); msg('🧪 Alien tissue sample +1', 1800); } PL.mobs.splice(i, 1); continue; } plMobStep(e, dt); }
   PL.spT -= dt; if (PL.spT <= 0) { PL.spT = 3; if (PL.mobs.length < D.cap) mkPlMob(PL.id); }
 }
+
+// perf: Area 51 + fair decor does not cast shadows (hundreds of small meshes doubled the draw cost)
+[a51Grp, fairGrp].forEach(g => g.traverse(o => { if (o.isMesh) o.userData.noShadow = true; }));

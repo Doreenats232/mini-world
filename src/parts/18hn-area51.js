@@ -76,7 +76,7 @@ function a51Use(f, o) {
   else if (f === 'a51research') { const t = A51TECH[A51.tech]; if (!t) return msg('👽 All research complete', 2200); if (A51.samples < t[1] || money < t[2]) return msg('🔬 Next: ' + t[0] + ' — needs ' + t[1] + ' samples + $' + t[2] + ' (you have ' + A51.samples + ' samples)', 3600); A51.samples -= t[1]; money -= t[2]; t[3](); A51.tech++; a51Save(); hud(); save(); msg('🔬 Research complete: ' + t[0], 3200); }
 }
 function a51Tick(dt) {
-  const dx = P.pos.x - AX, dz = P.pos.z - AZ; if (Math.abs(dx) > 240 || Math.abs(dz) > 220) return;
+  const dx = P.pos.x - AX, dz = P.pos.z - AZ; a51Grp.visible = !!A51.fly || (Math.abs(dx) < 420 && Math.abs(dz) < 400); if (Math.abs(dx) > 240 || Math.abs(dz) > 220) return;
   A51.pass = Math.max(0, A51.pass - dt); A51.alarm = Math.max(0, A51.alarm - dt); A51.msgT -= dt; const t = performance.now() / 1000, night = 1 - dayLight;
   if (!A51.fly) A51.ufo.position.y = A51.uy + Math.sin(t * 1.3) * 0.35; A51.ufo.rotation.y += dt * (A51.fly ? 1.2 : 0.35); A51M.green.emissiveIntensity = 1.0 + Math.sin(t * 3) * 0.5 + night; if (A51.dish) A51.dish.rotation.y += dt * 0.4; if (A51.radar) A51.radar.rotation.y += dt * 0.25;
   for (const l of A51.lights) { l.pv.rotation.y = t * 0.7 + l.ph; l.pv.rotation.x = 0.9 + Math.sin(t * 0.5 + l.ph) * 0.2; l.beam.material.opacity = Math.min(0.2, 0.03 + night * 0.17) * (A51.alarm > 0 ? 1.6 : 1); }

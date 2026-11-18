@@ -85,7 +85,7 @@ function rideStep(dt) {
 }
 let fairT = 0;
 function fairTick(dt) {
-  fairT += dt; const night = 1 - dayLight; FMT.light.emissiveIntensity = 0.5 + night * 2.4;
+  fairT += dt; const night = 1 - dayLight; fairGrp.visible = !!RIDE.on || Math.hypot(P.pos.x - (FX + 5), P.pos.z - FZ) < 450; FMT.light.emissiveIntensity = 0.5 + night * 2.4;
   if (Math.hypot(P.pos.x - (FX + 5), P.pos.z - FZ) > 120 && !RIDE.on) return;
   FERR.rot += FERR.speed * dt; FERR.g.rotation.z = FERR.rot; for (const c of FERR.cabins) { c.rotation.z = -FERR.rot; }
   CAR.rot += 0.6 * dt; CAR.g.rotation.y = CAR.rot; CAR.horses.forEach((h, i) => { h.position.y = 1.2 + Math.sin(fairT * 2.4 + i * 1.6) * 0.35; });
