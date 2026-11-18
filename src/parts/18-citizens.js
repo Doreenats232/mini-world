@@ -188,6 +188,7 @@ function moveToward(c, tg, sp, dt) { const dx = tg.x - c.pos.x, dz = tg.z - c.po
 function citizenStep(c, dt) {
   c.t += dt; const dp = dist2(c.pos, P.pos); c.speakT -= dt;
   if (c.downT > 0) { c.downT -= dt; if (c.kv) { c.pos.x += c.kv.x * dt; c.pos.z += c.kv.z * dt; c.kv.multiplyScalar(Math.max(0, 1 - dt * 4)); } if (c.downT <= 0) scareOne(c, P.pos, 6); return; }
+  if (c.fight) { fightStep(c, dt); return; }
   if (c.state === 'inside') { c.t2 -= dt; if (c.t2 <= 0) { c.hidden = false; c.g.visible = true; c.pos.copy(c.tgt); c.state = 'walk'; c.resnap = true; } return; }
   if (c.fleeT <= 0 && clock - c.chk > 0.5) { c.chk = clock; const e = nearestEnemy(c.pos, 9); if (e) scareOne(c, e.pos, 5); else if (inCar && Math.abs(inCar.speed) > 8 && dist2(inCar.pos, c.pos) < 11) scareOne(c, inCar.pos, 3); }
   if (c.fleeT > 0) { c.fleeT -= dt; const dx = c.pos.x - c.from.x, dz = c.pos.z - c.from.z, d = Math.hypot(dx, dz) || 1; c.pos.x += dx / d * 6.5 * dt; c.pos.z += dz / d * 6.5 * dt; c.yaw = Math.atan2(dx, dz); animWalk(c, 6.5, dt, 1.1); if (c.fleeT <= 0) c.resnap = true; return; }
