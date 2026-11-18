@@ -61,6 +61,7 @@ const INSTMATS = {
 const INSTFAC = { school: 1, university: 3, company: 2, nasa: 0, police: 2, bank: 3, prison: 1 };
 for (const b of institutions) {
   if (b.purpose === 'nasa') b.h = Math.max(b.h, 10.5);
+  if (b.purpose === 'university') b.h = Math.max(9, Math.min(b.h, 13));
   const [iw, ifl] = INSTMATS[b.purpose]; b.iv = iw; b.fv = ifl; b.v = INSTFAC[b.purpose];
   if (b.shell) { scene.remove(b.shell); const i = targets.indexOf(b.shell); if (i >= 0) targets.splice(i, 1); b.shell.geometry.dispose(); }
   const sh = buildShell(b); scene.add(sh.mesh); targets.push(sh.mesh); b.shell = sh.mesh; b.boxes = sh.boxes;
