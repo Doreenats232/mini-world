@@ -72,6 +72,7 @@ function useIt(u) {
   else if (f.startsWith('fair')) fairUse(f, u.owner);
   else if (f.startsWith('a51')) a51Use(f, u.owner);
   else if (f === 'nasarocket') nasaRocket(u.owner);
+  else if (f.startsWith('ent')) entUse(f, u.owner);
   else if (f.startsWith('pl')) planetUse(f, u.owner);
   else if (f === 'bed') { dayT = 0.27; msg('You slept. Good morning!', 2200); sfx('click'); }
 }
