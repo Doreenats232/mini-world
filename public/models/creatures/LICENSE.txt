@@ -1,0 +1,1 @@
+Creature models: CC0 1.0 (public domain) - Quaternius / Kenney, via the Net Forge CC0 asset library (npm @netforge/asset-library-files).

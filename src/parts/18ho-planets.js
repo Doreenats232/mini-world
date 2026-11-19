@@ -65,7 +65,7 @@ function planetSky(dt) {
 function mkPlMob(id) {
   const D = PLN[id], kind = D.mobs[Math.floor(Math.random() * D.mobs.length)], a = Math.random() * 6.283, r = 38 + Math.random() * 35, x = P.pos.x + Math.cos(a) * r, z = P.pos.z + Math.sin(a) * r;
   if (Math.hypot(x - D.x, z - D.z) > 740 || Math.hypot(x - D.dome.x, z - D.dome.z) < D.dome.r + 3) return;
-  const g = new THREE.Group(), anim = CRE[kind][2](g), big = kind === 4 ? 1.5 : 1.1; g.scale.setScalar(big); g.position.set(x, 0, z); scene.add(g);
+  const g = new THREE.Group(); g.userData.hunter = 1; const anim = CRE[kind][2](g), big = kind === 4 ? 1.5 : 1.1; g.scale.setScalar(big); g.position.set(x, 0, z); scene.add(g);
   const e = { ...mkEnt(x, 0, z, 0.5 * big, 1.7 * big), mesh: g, hp: D.hp * (kind === 4 ? 2 : 1), hurt: 0, cd: 1, dead: false, mob: 1, anim, sp: D.sp * (kind === 4 ? 0.75 : 1), dmg: D.dmg, kind, hd: Math.random() * 6.283, ht: 0 };
   g.traverse(m => { if (m.isMesh) { m.userData.enemy = e; enemyMeshes.push(m); } }); PL.mobs.push(e);
 }

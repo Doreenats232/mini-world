@@ -18,7 +18,7 @@ function abductStep(dt) {
 }
 function a51Breach() {
   const kinds = [8, 1, 2, 5, 4, 6, 10, 11, 9], n = 4 + Math.floor(Math.random() * 2); A51.alarm = 25;
-  for (let i = 0; i < n; i++) { const kind = kinds[Math.floor(Math.random() * kinds.length)], x = AX + 58 + Math.random() * 4, z = AZ - 15 + (Math.random() - 0.5) * 4, g = new THREE.Group(), anim = CRE[kind][2](g), big = kind === 4 ? 1.5 : 1.1; g.scale.setScalar(big); g.position.set(x, 0, z); scene.add(g);
+  for (let i = 0; i < n; i++) { const kind = kinds[Math.floor(Math.random() * kinds.length)], x = AX + 58 + Math.random() * 4, z = AZ - 15 + (Math.random() - 0.5) * 4, g = new THREE.Group(); g.userData.hunter = 1; const anim = CRE[kind][2](g), big = kind === 4 ? 1.5 : 1.1; g.scale.setScalar(big); g.position.set(x, 0, z); scene.add(g);
     const e = { ...mkEnt(x, 0, z, 0.5 * big, 1.7 * big), mesh: g, hp: kind === 4 ? 260 : 110, hurt: 0, cd: 1, dead: false, mob: 1, anim, sp: kind === 4 ? 4 : 5.2, dmg: 11, kind, hd: Math.random() * 6.283, ht: 0, esc: 1, life: 200 }; g.traverse(m => { if (m.isMesh) { m.userData.enemy = e; enemyMeshes.push(m); } }); A51.esc.push(e); }
   msg('🚨 CONTAINMENT BREACH at Area 51! Creatures have escaped', 5000);
 }
