@@ -43,6 +43,7 @@ jobs:
       - run: npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version --allow-same-version
       - run: npm run build
       - run: |
+          node -e "const f='capacitor.config.json',c=JSON.parse(require('fs').readFileSync(f));c.server={androidScheme:'https'};require('fs').writeFileSync(f,JSON.stringify(c))"
           npx cap add android
           npx cap sync android
           sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"${{ needs.prepare.outputs.version }}\"/" android/app/build.gradle

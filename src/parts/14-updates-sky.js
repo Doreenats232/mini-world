@@ -5,6 +5,12 @@ if (native) {
     const v = (j.tag_name || '').replace(/^v/, ''); if (!v || !newer(v, VER)) return;
     const u = $('upd'); u.style.display = 'block'; u.textContent = 'Update v' + v + ' downloading, restarts automatically';
   }).catch(() => {});
+} else if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+  // standalone Android app: the game is inside the APK, so a new version means a new APK
+  fetch('https://api.github.com/repos/' + REPO + '/releases/latest').then(r => r.json()).then(j => {
+    const v = (j.tag_name || '').replace(/^v/, ''); if (!v || !newer(v, VER)) return; const link = 'https://github.com/' + REPO + '/releases/latest/download/MiniWorld.apk';
+    const u = $('upd'); u.style.display = 'block'; u.style.pointerEvents = 'auto'; u.textContent = 'New version v' + v + ': tap to download the APK'; u.onclick = () => { try { window.Capacitor.Plugins.Browser.open({ url: link }); } catch (e) { window.open(link, '_blank'); } };
+  }).catch(() => {});
 } else if (location.protocol.startsWith('http')) {
   setInterval(async () => {
     try {

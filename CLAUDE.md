@@ -1,7 +1,7 @@
 # MiniWorld: project brief (read this first, then stop reading and start working)
 
 Owner: Daglas. Casual, wants SHORT replies, one upgrade at a time, and to spend his daily usage limit profitably.
-Game: 3D open-world sandbox (Three.js). One codebase -> website (GitHub Pages) + Android APK (Capacitor, loads the website) + Windows EXE (Electron, auto-updates).
+Game: 3D open-world sandbox (Three.js). One codebase -> website (GitHub Pages) + Android APK (Capacitor, standalone: the game is bundled inside the APK) + Windows EXE (Electron, auto-updates).
 Repo: Doreenats232/mini-world. Live: https://doreenats232.github.io/mini-world/ . Every push to `main` redeploys the site (~1 min), and open tabs reload themselves.
 
 ## How to work cheaply (rules for Claude)
