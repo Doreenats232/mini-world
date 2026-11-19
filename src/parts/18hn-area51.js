@@ -132,7 +132,7 @@ function a51Guards(dt) {
   const T = P.pos, inside = Math.abs(T.x - AX) < 62 && Math.abs(T.z - AZ) < 52 && T.y < 8, trespass = inside && A51.pass <= 0; A51.alert = Math.max(0, A51.alert - dt);
   for (let i = 0; i < GUARD_POSTS.length; i++) {
     let e = A51.guards[i];
-    if (!e || e.dead) { if (e && !e.counted) { e.counted = true; A51.alert = 90; A51.respawn[i] = 100; crime(2, 'killed Area 51 security', 'a51kill'); } A51.respawn[i] = (A51.respawn[i] || 0) - dt; if (A51.respawn[i] <= 0 && A51.alert <= 0 && !trespass) e = mkA51Guard(i); else continue; }
+    if (!e || e.dead) { if (e && !e.counted) { e.counted = true; A51.alert = 90; A51.respawn[i] = 100; if (Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z) < 25) { A51.pass = Math.max(A51.pass, 600); msg('🪪 You took the guard\'s pass: access for 10 min', 3500); } crime(2, 'killed Area 51 security', 'a51kill'); } A51.respawn[i] = (A51.respawn[i] || 0) - dt; if (A51.respawn[i] <= 0 && A51.alert <= 0 && !trespass) e = mkA51Guard(i); else continue; }
     if (stunned(e, dt)) continue;
     if (e.hp < e.lastHp) { A51.alert = Math.max(A51.alert, 60); e.lastHp = e.hp; }
     const dx = T.x - e.pos.x, dz = T.z - e.pos.z, d = Math.hypot(dx, dz), close = A51.pass <= 0 && d < 8 && !inCar;
