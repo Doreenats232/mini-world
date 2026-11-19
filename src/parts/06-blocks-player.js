@@ -28,7 +28,7 @@ const P = mkEnt(25, 1, 25, 0.35, 1.7); P.yaw = 0; P.pitch = 0; P.hp = 100;
 let kills = 0, mode = 'fight', inCar = null, lastHurt = -99, flashV = 0, clock = 0;
 let wanted = 0, lastCrime = -99, calmT = 0, copT = 0, copLeaveT = 5; const crimeCD = {};
 let money = 0, up = { dmg: 0, hp: 0, spd: 0 }, hasShotgun = false, weapon = 'pistol', shopOpen = false;
-const maxHp = () => 100 + 25 * up.hp;
+const maxHp = () => 100 + 25 * up.hp - AGE.pen;
 let pendingFurn = null;
 try {
   const s = JSON.parse(localStorage.getItem('mw_save') || 'null');

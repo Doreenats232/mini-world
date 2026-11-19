@@ -64,4 +64,4 @@ function beamTick() {
   if (!c || n < 0.05) { headBeam.intensity = 0; return; }
   const f = Math.sin(c.h), g = Math.cos(c.h); headBeam.position.set(c.pos.x + f * 1.9, 0.85, c.pos.z + g * 1.9); headBeam.target.position.set(c.pos.x + f * 22, 0, c.pos.z + g * 22); headBeam.target.updateMatrixWorld(); headBeam.intensity = 5 * n;
 }
-function fxTick(dt) { boomTick(dt); beamTick(); moodTick(dt); nasaTick(dt); fairTick(dt); a51Tick(dt); plTick(dt); entTick(dt); perfTick(dt); fightTick(dt); }
+function fxTick(dt) { boomTick(dt); beamTick(); moodTick(dt); nasaTick(dt); fairTick(dt); a51Tick(dt); plTick(dt); entTick(dt); famTick(dt); perfTick(dt); fightTick(dt); }

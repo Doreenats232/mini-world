@@ -51,7 +51,7 @@ function resPhase(r) {
   const y = ((dayT - r.leave) % 1 + 1) % 1; if (y < f) return ['toHome', y * 300]; return ['home', 0];
 }
 function updateResidents(dt) {
-  for (const r of residents) {
+  for (const r of residents) { if (r.fam) { if (r.c || r.car) unmatRes(r); continue; }
     if (r.vis) { updateVisit(r, dt); continue; }
     if (r.out > 0) { r.out -= dt; continue; } if (r.cool > 0) r.cool -= dt;
     if (r.c && r.c.dead) { r.c = null; r.cool = 6; }

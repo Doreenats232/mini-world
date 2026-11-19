@@ -24,3 +24,4 @@ const inSlum = (x, z) => x < 0 && (x < -360 || z < -360 || z > 330), inRich = (x
 
 const PL = { on: 0, jv: 11, id: '', launch: null, ret: null, o2: 100 };
 const PERF = { fr: 16, js: 0, t: 0, n: 0, sj: 0, sf: 0, mx: 0 };
+const AGE = { pen: 0 };

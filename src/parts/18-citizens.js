@@ -159,7 +159,7 @@ function citizenSay(c, text) {
   b.c = c; b.t = 3.5 + text.length / 14; b.bub.textContent = c.name + ': ' + text; b.el.style.display = 'block';
 }
 const nearestCitizen = () => { let b = null, bd = 2.8; for (const c of citizens) { if (c.hidden || c.dead) continue; const d = dist2(c.pos, P.pos); if (d < bd) { bd = d; b = c; } } return b; };
-function tryTalk() { const c = nearestCitizen(); if (!c) return false; const r = c.res; if (r && maybeGiveNumber(r, c)) return true; citizenSay(c, r && Math.random() < 0.6 ? (r.st === 'toWork' ? 'Heading to work at ' + r.workName + '.' : r.st === 'toHome' ? 'Finished at ' + r.workName + ', going home.' : 'I work at ' + r.workName + '.') : pick(CLINES[c.role || c.job] || CLINES.walker)); c.faceT = 3; sfx('click'); return true; }
+function tryTalk() { const c = nearestCitizen(); if (!c) return false; if (c.fam && famTalk(c)) return true; const r = c.res; if (r && maybeGiveNumber(r, c)) return true; citizenSay(c, r && Math.random() < 0.6 ? (r.st === 'toWork' ? 'Heading to work at ' + r.workName + '.' : r.st === 'toHome' ? 'Finished at ' + r.workName + ', going home.' : 'I work at ' + r.workName + '.') : pick(CLINES[c.role || c.job] || CLINES.walker)); c.faceT = 3; sfx('click'); return true; }
 function scareOne(c, from, t) { if (c.job === 'guard') return; c.fleeT = t; c.from.set(from.x, 0, from.z); c.sit = false; if (Math.random() < 0.5) citizenSay(c, pick(['Aah!', 'Run!', 'Help!', 'Watch out!'])); }
 function scare(pos, r) { for (const c of citizens) if (!c.hidden && !c.dead && dist2(c.pos, pos) < r) scareOne(c, pos, 6); }
 

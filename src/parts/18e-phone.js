@@ -45,7 +45,9 @@ function renderPhone() {
   if (phoneSel && contacts.includes(phoneSel)) {
     const c = phoneSel, lg = document.createElement('div'); lg.className = 'lg'; lg.innerHTML = '<i>' + c.r.name + ' is ' + resStatus(c.r) + '</i><br>' + c.log.slice(-12).map(t => t.replace(/</g, '&lt;')).join('<br>'); e.appendChild(lg);
     for (const [k, t] of [['call', '📞 Call'], ['how', '💬 How are you?'], ['where', '💬 Where are you?'], ['come', '💬 Come to my place']]) { const b = document.createElement('button'); b.textContent = t; b.onclick = () => phoneMsg(c.r, k); e.appendChild(b); }
+    famPhone(c.r, e);
   }
+  famSection(e);
   $('phx').onclick = closePhone;
 }
 // ---- an NPC travelling to you: walks or drives the real roads, waits, then goes home ----
