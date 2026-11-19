@@ -183,6 +183,9 @@ step('Family: affection, proposal, marriage, home, kids, ageing', () => {
   const b = api.buildings.find(x => Math.abs(x.x - api.FAM.home.x) < 1 && Math.abs(x.z - api.FAM.home.z) < 1); api.P.pos.set(b.x + 6, 0, b.z + 6); api.FAM.kids.push({ n: 'Kid', age: 8, g: 'g', pm: -1 }); frames(120);
   api.FAM.kids.length = 0; api.FAM.preg = null; let tries = 0; while (!api.FAM.preg && tries++ < 40) { api.famDebugTime(0.85); api.famAct(r, 'night'); frames(20); } if (!api.FAM.preg) throw new Error('never conceived in 40 nights');
   api.famDebugTime(0.4); api.FAM.preg.t = 0.3; frames(5); if (!api.FAM.preg.told) throw new Error('pregnancy not announced'); api.FAM.preg.t = 1.45; frames(80); api.FAM.preg.t = 1.499; frames(300); if (api.FAM.preg || api.FAM.kids.length < 1) throw new Error('no birth after 9 months');
-  api.FAM.spouse = null; api.FAM.home = null; frames(30); api.P.pos.set(0, 0, 0); frames(30);
+  api.FAM.spouse = null; api.FAM.kids.length = 0; api.FAM.preg = null; api.FAM.pp.length = 0; const r2 = api.residents[7]; api.contacts.push({ r: r2, log: [] }); api.FAM.aff[r2.id] = 90; r2.role = 'worker'; api.P.pos.set(25, 0, 25);
+  let t2 = 0; while (!api.FAM.pp.length && t2++ < 40) { r2.vis = { st: 'wait', pos: { x: 25, z: 25 } }; api.famAct(r2, 'together'); r2.vis = null; frames(5); } if (!api.FAM.pp.length) throw new Error('unmarried partner never conceived');
+  api.FAM.pp[0].t = 0.3; frames(5); if (!api.FAM.pp[0].told) throw new Error('partner pregnancy not announced'); api.FAM.pp[0].t = 1.499; frames(300); if (api.FAM.pp.length || api.FAM.kids.length < 1 || !api.FAM.kids[0].mom) throw new Error('no birth from unmarried partner');
+  api.FAM.home = null; frames(30); api.P.pos.set(0, 0, 0); frames(30);
 });
 console.log(fails ? `\n${fails} SMOKE CHECK(S) FAILED` : '\nSMOKE TEST PASSED'); process.exit(fails ? 1 : 0);
