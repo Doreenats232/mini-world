@@ -73,6 +73,7 @@ function useIt(u) {
   else if (f.startsWith('a51')) a51Use(f, u.owner);
   else if (f === 'nasarocket') nasaRocket(u.owner);
   else if (f.startsWith('ent')) entUse(f, u.owner);
+  else if (f.startsWith('bk')) bkUse(f, u.owner);
   else if (f.startsWith('pl')) planetUse(f, u.owner);
   else if (f === 'bed') { dayT = 0.27; msg('You slept. Good morning!', 2200); sfx('click'); }
 }
@@ -100,7 +101,7 @@ function mkCityDoor(b) {
 function spawnInterior(b) {
   let sd = (b.id * 7919 + 13) % 2147483647 || 1; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
   const kind = b.purpose ? ({ school: 'school', university: 'prison', company: 'office', nasa: 'prison', mall: 'prison', police: 'office', bank: 'office', prison: 'prison' })[b.purpose] : ['home', 'office', 'store', 'cafe'][Math.floor(r() * 4)], groups = [], PI = Math.PI, crowd = [];
-  const put = (type, x, z, rot) => { if (b.shaft && x > b.shaft.x0 - 1 && x < b.shaft.x1 + 1 && z > b.shaft.z0 - 1 && z < b.shaft.z1 + 1) return; const g = new THREE.Group(); mkFurn(type, g); g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g); groups.push(g); if (USEF.has(type)) regUse(g, type, b); };
+  const put = (type, x, z, rot) => { if (b.vault && x > b.vault.x0 && x < b.vault.x1 && z > b.vault.z0 && z < b.vault.z1) return; if (b.shaft && x > b.shaft.x0 - 1 && x < b.shaft.x1 + 1 && z > b.shaft.z0 - 1 && z < b.shaft.z1 + 1) return; const g = new THREE.Group(); mkFurn(type, g); g.position.set(x, 0, z); g.rotation.y = rot; scene.add(g); groups.push(g); if (USEF.has(type)) regUse(g, type, b); };
   const slots = [];
   for (const sr of [0, PI / 2, PI, -PI / 2]) {
     const sx = Math.round(Math.sin(sr)), sz = Math.round(Math.cos(sr)), tx = Math.round(Math.cos(sr)), tz = -Math.round(Math.sin(sr));
