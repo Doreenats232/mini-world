@@ -45,6 +45,7 @@ jobs:
       - run: |
           node -e "const f='capacitor.config.json',c=JSON.parse(require('fs').readFileSync(f));c.server={androidScheme:'https'};require('fs').writeFileSync(f,JSON.stringify(c))"
           npx cap add android
+          rm -f android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml android/app/src/main/res/drawable/ic_launcher_background.xml
           cp -r resources/android-res/. android/app/src/main/res/
           npx cap sync android
           sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"${{ needs.prepare.outputs.version }}\"/" android/app/build.gradle
